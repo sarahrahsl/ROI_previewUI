@@ -4,6 +4,7 @@ from PyQt5.QtWidgets import (
     QSpacerItem, QHBoxLayout, QVBoxLayout, QGroupBox, QLineEdit, QFormLayout, QFileDialog
 )
 
+from PyQt5.QtCore import Qt
 import numpy as np
 import h5py as h5
 import matplotlib.pyplot as plt
@@ -31,8 +32,8 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        ##########################################################################
-        ################# Layout #################################################
+        #######################################################################################################
+        ############################################## Layout #################################################
 
         self.setWindowTitle("ROI Preview")
 
@@ -43,10 +44,17 @@ class MainWindow(QMainWindow):
 
         # Readme Note
         note_label = QLabel("Caution! Beware of out of bound error: \n \
-              You are viewing the 3x downsampled of fused.h5 file, so axis abd dimension should be x4 \n \
+              You are viewing the 8x downsampled of fused.h5 file, so axis abd dimension should be x4 \n \
               Make sure enough space saving coords on edges, do not save when current z-level > z dim - 12 \n \
               Try not to zoom in to an ROI smaller than 160x160p \n \n \
                     Press 'Save params' after you got the desired coords and clipping vals for all 3 channels")
+
+        # Loading data label
+        self.loading_label = QLabel()
+        self.loading_label.setStyleSheet("color: red;")
+        note_layout = QHBoxLayout()
+        note_layout.addWidget(note_label, alignment=Qt.AlignTop | Qt.AlignLeft)
+        note_layout.addWidget(self.loading_label, alignment=Qt.AlignBottom | Qt.AlignRight)
 
         # Create a matplotlib figure
         self.figure = plt.figure()
@@ -54,7 +62,7 @@ class MainWindow(QMainWindow):
         self.canvas.mpl_connect('button_release_event', self.on_zoom_completed)
         self.toolbar = NavigationToolbar(self.canvas, self)        
 
-        # Add button to change between channels
+        ############ Add button to change between channels ###########
         button_layout = QHBoxLayout()
         self.cyto_button = QPushButton("Cyto")
         self.cyto_button.setCheckable(True)
@@ -72,7 +80,7 @@ class MainWindow(QMainWindow):
         button_container.setLayout(button_layout)
         self.setCentralWidget(button_container)
 
-        # Add x,y,z coordinate display
+        ############# Add x,y,z coordinate display #################
         self.x_coordinate_textbox = QLineEdit()
         self.x_coordinate_textbox.setReadOnly(True)
         self.y_coordinate_textbox = QLineEdit()
@@ -89,28 +97,28 @@ class MainWindow(QMainWindow):
         coordinates_container = QGroupBox("Coordinates")
         coordinates_container.setLayout(form_layout)
 
-        # Add ROI dimension textbox, Crop button, and Auto Rescale button
-        roi_dim_textbox = QLineEdit()
-        roi_dim_label = QLabel("ROI dim:")
+        ############ Add ROI dimension textbox, Crop button, and Auto Rescale button ################
+        self.roi_dim_textbox = QLineEdit()
+        self.roi_dim_textbox.setText("640")  # Set default value to 640
+        self.roi_dim_textbox.textChanged.connect(self.ROI_dim_changed)
+        roi_dim_label = QLabel("ROI dim (1x downsampled data)")
         crop_button = QPushButton("Crop")
+        crop_button.clicked.connect(self.Crop_ROI)
         auto_rescale_button = QPushButton("Auto Rescale")
-
         roi_dim_layout = QHBoxLayout()
         roi_dim_layout.addWidget(roi_dim_label)
-        roi_dim_layout.addWidget(roi_dim_textbox)
-
+        roi_dim_layout.addWidget(self.roi_dim_textbox)
         button_layout2 = QHBoxLayout()
         button_layout2.addWidget(crop_button)
         button_layout2.addWidget(auto_rescale_button)
 
-        # Create a group box for the buttons and textbox
-        button_group = QGroupBox()
+        button_group = QGroupBox("ROI Visualization")
         button_group_layout = QVBoxLayout()
         button_group_layout.addLayout(roi_dim_layout)
         button_group_layout.addLayout(button_layout2)
         button_group.setLayout(button_group_layout)
 
-        # Add Contrast enhancement for cyto channel
+        ########### Add Contrast enhancement for cyto channel #################
         ClipLow_Cyto_default = 0
         ClipHigh_Cyto_default = 1200
         dropdown_layout1 = QVBoxLayout()
@@ -140,7 +148,7 @@ class MainWindow(QMainWindow):
         dropdown_container1 = QGroupBox("Cyto")
         dropdown_container1.setLayout(dropdown_layout1)
 
-        # Add Contrast enhancement for Nuc channel
+        ############ Add Contrast enhancement for Nuc channel ###############
         ClipLow_Nuc_default = 0
         ClipHigh_Nuc_default = 2000
         dropdown_layout2 = QVBoxLayout()
@@ -170,7 +178,7 @@ class MainWindow(QMainWindow):
         dropdown_container2 = QGroupBox("Nuc")
         dropdown_container2.setLayout(dropdown_layout2)
 
-        # Add Contrast enhancement for Target channel
+        ############### Add Contrast enhancement for Target channel #################
         ClipLow_PGP_default = 0
         ClipHigh_PGP_default = 700
         dropdown_layout3 = QVBoxLayout()
@@ -202,7 +210,7 @@ class MainWindow(QMainWindow):
         dropdown_container3 = QGroupBox("Target")
         dropdown_container3.setLayout(dropdown_layout3)
 
-        # Add Save button and home button
+        ############# Add Save button and home button ##################
         file_button = QPushButton("Select File")
         file_button.clicked.connect(self.select_file) 
         home_button = QPushButton("Home")
@@ -219,7 +227,7 @@ class MainWindow(QMainWindow):
         button_layout.addStretch()
 
         # Configure left layout and right layout and make it central
-        left_layout.addWidget(note_label)
+        left_layout.addLayout(note_layout)
         left_layout.addWidget(self.canvas, stretch=1)
         left_layout.addWidget(self.toolbar)
         left_layout.addWidget(button_container)
@@ -237,8 +245,8 @@ class MainWindow(QMainWindow):
 
         self.cid = None
 
-        ############# End of Layout #######################################################
-        ###################################################################################
+        #################################### End of Layout #######################################################
+        ##########################################################################################################
 
         # Initialization
         self.select_file() # Including readHDF5() and plot_init_z()
@@ -246,7 +254,7 @@ class MainWindow(QMainWindow):
         # Connect the mouse wheel event to the update_z_level method
         self.canvas.mpl_connect('scroll_event', self.update_z_level)
 
-    ##################### Initialization functions ###########################################
+    ##################### Initialization functions  ###########################################
 
     def readHDF5(self):
     
@@ -263,12 +271,16 @@ class MainWindow(QMainWindow):
 
     def plot_init_z(self):
 
+        """
+        The following will only be run once
+        """
         # Initial params
         self.img = self.cyto
         self.current_chan = "cyto"
         self.vmax = 1200
         self.ClipLowLim = 0
         self.ClipHighLim = 1200
+        self.ROI_dim = 640
 
         # Display current z-level and vol shape
         self.shape = self.img.shape
@@ -298,7 +310,6 @@ class MainWindow(QMainWindow):
         self.ClipLowLim_nuc.setEnabled(False)  
         self.ClipHighLim_pgp.setEnabled(False) 
         self.ClipLowLim_pgp.setEnabled(False)
-
         self.go_home()
 
 
@@ -405,8 +416,23 @@ class MainWindow(QMainWindow):
 
         self.plot_slice()
 
+    ######################### Cropping ROI and auto rescale ################################
 
-    ########################### Update Clip limits #######################################
+    def ROI_dim_changed(self):
+        self.ROI_dim = self.roi_dim_textbox.text()
+
+    def Crop_ROI(self):
+        ROI_dim = float(self.ROI_dim)
+        xstart = self.x_limits[0]
+        ystart = self.y_limits[1]
+        xend = xstart + ROI_dim/4
+        yend = ystart + ROI_dim/4
+        self.x_limits = [xstart, xend]
+        self.y_limits = [yend, ystart]
+        self.plot_slice()
+
+
+    ########################### Update Clip limits, ROI dim property #############################
 
     def cyto_clip_lower_change(self):
         self.ClipLowLim = self.ClipLowLim_cyto.value()
@@ -503,6 +529,21 @@ class MainWindow(QMainWindow):
 
         self.canvas.draw()
 
+    ############################## Print loading/saving ###################################
+
+    def show_loading_data(self):
+        self.loading_label.setText("Loading data...")
+        QApplication.processEvents()
+
+    def hide_text(self):
+        self.loading_label.clear()
+        QApplication.processEvents()
+
+    def show_saving(self):
+        self.loading_label.setText("Saving selected coords...")
+        QApplication.processEvents()
+
+
     ################################ Action buttons ######################################
 
     def select_file(self):
@@ -510,21 +551,22 @@ class MainWindow(QMainWindow):
         This function..
         - allows user select file to preview
         - record file path
-        - read HDF5 file and plot initial z-level
+        - call the function: readHDF5 and plotinit
         """
         file_dialog = QFileDialog()
         file_dialog.setDirectory("W:/Trilabel_Data")
         file_path, _ = file_dialog.getOpenFileName(self, "Select File")
         if file_path:
             self.h5path = file_path
+            print(self.h5path)
+            self.show_loading_data()
+            self.readHDF5()
+            self.plot_init_z()
+            self.hide_text()
         else: 
-            self.h5path = "W:\\Trilabel_Data\\PGP9.5\\OTLS4_NODO_6-7-23_16-043J_PGP9.5\\data-f0.h5"
+            #self.h5path = "W:\\Trilabel_Data\\PGP9.5\\OTLS4_NODO_6-7-23_16-043J_PGP9.5\\data-f0.h5"
+            pass
         
-        print(self.h5path)
-        self.readHDF5()
-        self.plot_init_z()
-
-
 
     def go_home(self):
         """
@@ -535,12 +577,15 @@ class MainWindow(QMainWindow):
         self.dropdown3.setCurrentIndex(0) # change the method to "rescale"
         self.plot_slice()
 
+
     def save_coords(self):
         """
         This function..
         - retrieves all the values to be saved
         - write it into a .csv file when "Save" button is clicked
         """
+        self.show_saving()
+
         xcoord   = int(self.x_limits[0]*4)
         ycoord   = int(self.y_limits[1]*4)
         currentZ = int(self.current_z_level*4)
@@ -554,7 +599,7 @@ class MainWindow(QMainWindow):
         pgp_ctehmt_method = self.dropdown3.currentText()
         h5path = self.h5path
 
-        headers = ["h5path", "xcoord", "ycoord", "CurrentZlevel", "Shape(3xds)",
+        headers = ["h5path", "xcoord", "ycoord", "CurrentZlevel", "Shape(8xds)",
                    "cyto_clipLow", "cyto_clipHigh", "nuc_clipLow", "nuc_clipHigh",
                    "pgp_ctehmt_method", "pgp_clipLow", "pgp_clipHigh"]
         values =  [h5path, ycoord, xcoord, currentZ, shape,
@@ -568,6 +613,8 @@ class MainWindow(QMainWindow):
             if file.tell() == 0:
                 writer.writerow(headers)
             writer.writerow(values)
+        
+        self.hide_text()
 
 
 app = QApplication([])
