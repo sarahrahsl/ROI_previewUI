@@ -43,15 +43,16 @@ class MainWindow(QMainWindow):
         right_layout = QVBoxLayout()
 
         # Readme Note
-        note_label = QLabel("Caution! Beware of out of bound error: \n \
-              You are viewing the 8x downsampled of fused.h5 file, so axis abd dimension should be x4 \n \
-              Make sure enough space saving coords on edges, do not save when current z-level > z dim - 12 \n \
-              Try not to zoom in to an ROI smaller than 160x160p \n \n \
-                    Press 'Save params' after you got the desired coords and clipping vals for all 3 channels")
+        note_label = QLabel("Quick instruction: \n\
+        1. Zoom to desired ROI, input ROI dimension, press 'Crop' \n\
+        2. Find manually or press 'Auto Rescale' for optimal contrast clipping values for all 3 channels \n\
+        3. Press 'Save params' to save to .csv file, press 'home' to go back or 'Select File' for another data \n \
+You are viewing the 8x downsampled of fused.h5 file. \n \
+Make sure there is enough space when saving params on edges, check x,y and z coords. \n \
+Try not to zoom in smaller than 160x160p for CLAHE. ")
 
         # Loading data label
         self.loading_label = QLabel()
-        self.loading_label.setStyleSheet("color: red;")
         note_layout = QHBoxLayout()
         note_layout.addWidget(note_label, alignment=Qt.AlignTop | Qt.AlignLeft)
         note_layout.addWidget(self.loading_label, alignment=Qt.AlignBottom | Qt.AlignRight)
@@ -94,7 +95,7 @@ class MainWindow(QMainWindow):
         form_layout.addRow("y-coordinate:", self.y_coordinate_textbox)
         form_layout.addRow("Current Z-Level:", self.current_z_level_textbox)
         form_layout.addRow("Vol Dim [z,y,x]:", self.arrayshape_textbox)
-        coordinates_container = QGroupBox("Coordinates")
+        coordinates_container = QGroupBox("Coordinates [3x downsampled]")
         coordinates_container.setLayout(form_layout)
 
         ############ Add ROI dimension textbox, Crop button, and Auto Rescale button ################
@@ -102,14 +103,16 @@ class MainWindow(QMainWindow):
         self.roi_dim_textbox.setText("640")  # Set default value to 640
         self.roi_dim_textbox.textChanged.connect(self.ROI_dim_changed)
         roi_dim_label = QLabel("ROI dim (1x downsampled data)")
-        crop_button = QPushButton("Crop")
-        crop_button.clicked.connect(self.Crop_ROI)
+        self.crop_button = QPushButton("Crop")
+        self.crop_button.setCheckable(True)
+        self.crop_button.clicked.connect(self.Crop_ROI)
         auto_rescale_button = QPushButton("Auto Rescale")
+        auto_rescale_button.clicked.connect(self.Auto_Rescale)
         roi_dim_layout = QHBoxLayout()
         roi_dim_layout.addWidget(roi_dim_label)
         roi_dim_layout.addWidget(self.roi_dim_textbox)
         button_layout2 = QHBoxLayout()
-        button_layout2.addWidget(crop_button)
+        button_layout2.addWidget(self.crop_button)
         button_layout2.addWidget(auto_rescale_button)
 
         button_group = QGroupBox("ROI Visualization")
@@ -136,7 +139,7 @@ class MainWindow(QMainWindow):
         clip_low_layout1 = QHBoxLayout()
         clip_low_layout1.addWidget(QLabel("Clip Low:"))
         self.ClipLowLim_cyto = QDoubleSpinBox()
-        self.ClipLowLim_cyto.setRange(0, 4500)
+        self.ClipLowLim_cyto.setRange(0, 1000)
         self.ClipLowLim_cyto.setSingleStep(50)
         self.ClipLowLim_cyto.setValue(ClipLow_Cyto_default)
         self.ClipHighLim_cyto.valueChanged.connect(self.cyto_clip_higher_change)
@@ -159,14 +162,14 @@ class MainWindow(QMainWindow):
         clip_high_layout2 = QHBoxLayout()
         clip_high_layout2.addWidget(QLabel("Clip High:"))
         self.ClipHighLim_nuc = QDoubleSpinBox()
-        self.ClipHighLim_nuc.setRange(0, 4500)
+        self.ClipHighLim_nuc.setRange(0, 5500)
         self.ClipHighLim_nuc.setSingleStep(50)
         self.ClipHighLim_nuc.setValue(ClipHigh_Nuc_default)
         clip_high_layout2.addWidget(self.ClipHighLim_nuc)
         clip_low_layout2 = QHBoxLayout()
         clip_low_layout2.addWidget(QLabel("Clip Low:"))
         self.ClipLowLim_nuc = QDoubleSpinBox()
-        self.ClipLowLim_nuc.setRange(0, 4500)
+        self.ClipLowLim_nuc.setRange(0, 1000)
         self.ClipLowLim_nuc.setSingleStep(50)
         self.ClipLowLim_nuc.setValue(ClipLow_Nuc_default) 
         self.ClipHighLim_nuc.valueChanged.connect(self.nuc_clip_higher_change)
@@ -197,7 +200,7 @@ class MainWindow(QMainWindow):
         clip_low_layout3 = QHBoxLayout()
         clip_low_layout3.addWidget(QLabel("Clip Low:"))
         self.ClipLowLim_pgp = QDoubleSpinBox()
-        self.ClipLowLim_pgp.setRange(0, 4500)
+        self.ClipLowLim_pgp.setRange(0, 1000)
         self.ClipLowLim_pgp.setSingleStep(50)
         self.ClipLowLim_pgp.setValue(ClipLow_PGP_default)
         self.ClipHighLim_pgp.valueChanged.connect(self.pgp_clip_higher_change)
@@ -299,6 +302,7 @@ class MainWindow(QMainWindow):
         self.x_limits = ax.get_xlim()
         self.y_limits = ax.get_ylim()
 
+        self.cyto_button.setChecked(True)
         self.nuc_button.setChecked(False)  
         self.target_button.setChecked(False)
         self.dropdown1.setEnabled(True)
@@ -333,6 +337,12 @@ class MainWindow(QMainWindow):
             self.x_coordinate_textbox.update()
             self.y_coordinate_textbox.update()
 
+            if self.x_limits[0] + int(self.ROI_dim)/4 > self.shape[2] - 1 or \
+               self.y_limits[1] + int(self.ROI_dim)/4 > self.shape[1] - 1 :
+                self.show_OutofBound()
+            else: 
+                self.hide_text()
+
 
     ########################## Update current Z-level ##########################################
 
@@ -344,15 +354,20 @@ class MainWindow(QMainWindow):
             # Update the z-level based on the scroll direction
             if event.button == 'up':
                 current_z_level += 1
-                if current_z_level >= self.shape[0]:
+                if current_z_level >= self.shape[0]: # deepest level limit
                     current_z_level = self.shape[0] - 1
             else:
                 current_z_level -= 1
-                if current_z_level < 0:
+                if current_z_level < 0: # surface level limit
                     current_z_level = 0
 
             self.current_z_level = current_z_level
             self.current_z_level_textbox.setText(str(self.current_z_level))
+
+            if current_z_level > self.shape[0] - 13: # out of bound error
+                self.show_OutofBound()
+            else: 
+                self.hide_text()
 
             self.plot_slice()
 
@@ -429,10 +444,34 @@ class MainWindow(QMainWindow):
         yend = ystart + ROI_dim/4
         self.x_limits = [xstart, xend]
         self.y_limits = [yend, ystart]
+        self.crop_button.setChecked(True)
         self.plot_slice()
 
+    def Auto_Rescale(self):
+        """
+        This function calculate the p2 and p98 and update them.
+        Plot will automatically update when values of the properties are changed
+        """
+        current_slice = self.img[self.current_z_level, :, :]
+        xstart = int(self.x_limits[0])
+        xend = int(self.x_limits[1])
+        ystart = int(self.y_limits[1])
+        yend = int(self.y_limits[0])
+        current_ROI = current_slice[ystart:yend,xstart:xend]
+        p2, p98 = np.percentile(current_ROI, (2,98))
+        p98 = p98*1.1
+        if self.current_chan == "cyto":
+            self.ClipHighLim_cyto.setValue(int(p98)) 
+            self.ClipLowLim_cyto.setValue(int(p2))
+        elif self.current_chan == "nuc":
+            self.ClipHighLim_nuc.setValue(int(p98)) 
+            self.ClipLowLim_nuc.setValue(int(p2))
+        else:
+            self.ClipHighLim_pgp.setValue(int(p98)) 
+            self.ClipLowLim_pgp.setValue(int(p2))
 
-    ########################### Update Clip limits, ROI dim property #############################
+
+    ############################## Update Clip limits ######################################
 
     def cyto_clip_lower_change(self):
         self.ClipLowLim = self.ClipLowLim_cyto.value()
@@ -533,6 +572,7 @@ class MainWindow(QMainWindow):
 
     def show_loading_data(self):
         self.loading_label.setText("Loading data...")
+        self.loading_label.setStyleSheet("color: blue;")
         QApplication.processEvents()
 
     def hide_text(self):
@@ -541,6 +581,12 @@ class MainWindow(QMainWindow):
 
     def show_saving(self):
         self.loading_label.setText("Saving selected coords...")
+        self.loading_label.setStyleSheet("color: green;")
+        QApplication.processEvents()
+
+    def show_OutofBound(self):
+        self.loading_label.setText("Out of bound! Don't save!")
+        self.loading_label.setStyleSheet("color: red;")
         QApplication.processEvents()
 
 
@@ -554,7 +600,7 @@ class MainWindow(QMainWindow):
         - call the function: readHDF5 and plotinit
         """
         file_dialog = QFileDialog()
-        file_dialog.setDirectory("W:/Trilabel_Data")
+        # file_dialog.setDirectory("W:/Trilabel_Data")
         file_path, _ = file_dialog.getOpenFileName(self, "Select File")
         if file_path:
             self.h5path = file_path
@@ -575,6 +621,7 @@ class MainWindow(QMainWindow):
         self.x_limits = [0, self.shape[2]]
         self.y_limits = [self.shape[1], 0]
         self.dropdown3.setCurrentIndex(0) # change the method to "rescale"
+        self.crop_button.setChecked(False)
         self.plot_slice()
 
 
