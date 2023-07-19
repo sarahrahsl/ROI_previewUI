@@ -15,13 +15,6 @@ import csv
 import datetime
 
 """
-v1: all channels with CLAHE and Rescale
-v2: only target CLAHE others Rescale
-
-If you are accessing from a different server/machine:
-******REMEMBER TO CHANGE THE SERVER DRIVE******
-Change it in the function: select_file(self)
-Example: "W:/Trilabel_Data" to "X:/Trilabel_Data"
 
 Sarah, Jul 2023
 """
