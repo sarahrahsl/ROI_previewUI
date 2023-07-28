@@ -93,7 +93,7 @@ Try not to zoom in smaller than 160x160p for CLAHE. ")
 
         ############ Add ROI dimension textbox, Crop button, and Auto Rescale button ################
         self.roi_dim_textbox = QLineEdit()
-        self.roi_dim_textbox.setText("640")  # Set default value to 640
+        self.roi_dim_textbox.setText("512")  # Set default value to 512
         self.roi_dim_textbox.textChanged.connect(self.ROI_dim_changed)
         roi_dim_label = QLabel("ROI dim (1x downsampled data)")
         self.crop_button = QPushButton("Crop")
@@ -257,12 +257,18 @@ Try not to zoom in smaller than 160x160p for CLAHE. ")
         start = time.time()
         with h5.File(self.h5path, 'r') as f:
             self.cyto = f['t00000']['s00']['3/cells'][:, :, :].astype(np.uint16)
-            self.cyto = np.moveaxis(self.cyto, 0, 1)
             self.nuc = f['t00000']['s01']['3/cells'][:, :, :].astype(np.uint16)
-            self.nuc = np.moveaxis(self.nuc, 0, 1)
             self.pgp = f['t00000']['s02']['3/cells'][:, :, :].astype(np.uint16)
-            self.pgp = np.moveaxis(self.pgp, 0, 1)
         f.close()
+
+        if self.cyto.shape[0] < self.cyto.shape[1]:
+            self.orient = 0
+        else: 
+            self.orient = 1
+            self.cyto = np.moveaxis(self.cyto, 0, 1)
+            self.nuc = np.moveaxis(self.nuc, 0, 1)
+            self.pgp = np.moveaxis(self.pgp, 0, 1)
+
         print(time.time() - start, "s")
 
     def plot_init_z(self):
@@ -276,7 +282,7 @@ Try not to zoom in smaller than 160x160p for CLAHE. ")
         self.vmax = 1200
         self.ClipLowLim = 0
         self.ClipHighLim = 1200
-        self.ROI_dim = 640
+        self.ROI_dim = 512
 
         # Display current z-level and vol shape
         self.shape = self.img.shape
@@ -629,6 +635,8 @@ Try not to zoom in smaller than 160x160p for CLAHE. ")
         xcoord   = int(self.x_limits[0]*4)
         ycoord   = int(self.y_limits[1]*4)
         currentZ = int(self.current_z_level*4)
+        ROI_dim = int(self.ROI_dim)
+        orient = int(self.orient)
         shape    = self.arrayshape_textbox.text()
         cyto_clipLow  = self.ClipLowLim_cyto.value()
         cyto_clipHigh = self.ClipHighLim_cyto.value()
@@ -639,11 +647,11 @@ Try not to zoom in smaller than 160x160p for CLAHE. ")
         pgp_ctehmt_method = self.dropdown3.currentText()
         h5path = self.h5path
 
-        headers = ["h5path", "xcoord", "ycoord", "CurrentZlevel", "Shape(8xds)",
-                   "cyto_clipLow", "cyto_clipHigh", "nuc_clipLow", "nuc_clipHigh",
+        headers = ["h5path", "xcoord", "ycoord", "zcoord", "ROIdim", "Shape(8xds)",
+                   "orient", "cyto_clipLow", "cyto_clipHigh", "nuc_clipLow", "nuc_clipHigh",
                    "pgp_ctehmt_method", "pgp_clipLow", "pgp_clipHigh"]
-        values =  [h5path, ycoord, xcoord, currentZ, shape,
-                   cyto_clipLow, cyto_clipHigh, nuc_clipLow,
+        values =  [h5path, ycoord, xcoord, currentZ, ROI_dim, shape,
+                   orient, cyto_clipLow, cyto_clipHigh, nuc_clipLow,
                    nuc_clipHigh, pgp_ctehmt_method, pgp_clipLow, pgp_clipHigh]
 
         date =  str(datetime.date.today())

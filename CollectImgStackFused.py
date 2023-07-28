@@ -2,9 +2,6 @@ import os
 import numpy as np
 import skimage as sk
 from pathos.multiprocessing import ProcessingPool
-import h5py as h5
-import glob
-import matplotlib.pyplot as plt
 
 
 def writeImages(imagePair):
@@ -71,67 +68,13 @@ def __preProcess(image):
     return equalized_image.astype(np.uint8)
 
 
-def getBackgroundLevels(self, image, threshold=50):
-    """
-    Calculate foreground and background values based on image
-    statistics, background is currently set to be 20% of foreground.
-
-    Params:
-    - image : 2D numpy array
-    - threshold : int, threshold above which is counted as foreground
-
-    Returns:
-    - hi_val : int, Foreground values
-    - background : int, Background value
-    """
-
-    image_DS = np.sort(image, axis=None)
-    foreground_vals = image_DS[np.where(image_DS > threshold)]
-    hi_val = foreground_vals[int(np.round(len(foreground_vals)*0.95))]
-    background = hi_val/5
-
-    return hi_val, background
-
-
-def StripeFix(img):
-    """
-    Fix the vertical striping effect;
-    Dividing each row in the image by the sum of binning all columns.
-
-    Params: 
-    - img : 2D numpy array
-    
-    Returns: 
-    - img_nobg : stripe-fixed image
-    """
-    
-    # Get background
-    img_background = getBackgroundLevels(img)[1]
-    img_nobg = np.clip(img - 0.5*img_background, 0, 2**16)
-
-    # Calculate profiles with background removed
-    line_prof_n_nobg = np.zeros((img_nobg.shape[1]),dtype = np.float64) 
-    
-    ## Grab horizontal line profile 
-    for col in range(img_nobg.shape[1]):
-        line_prof_n_nobg[col] = np.sum(img_nobg[:, col].astype(np.float64)) 
-
-    line_prof_n_nobg = line_prof_n_nobg/np.max(line_prof_n_nobg) # normalize w/ max
-
-    for row in range(img_nobg.shape[0]):
-        img_nobg[row, :] = img_nobg[row, :]/line_prof_n_nobg
-    
-    img_nobg[img_nobg<0] = 0
-    return img_nobg.astype(np.uint16)
-
-
-
 def collectImgStackFused(f,
                     saveroot,
                     block_name,
                     zcoords,
                     xcoords,
                     ycoords,
+                    orient,
                     CLAHE=True,
                     hiclip_val  = 1500, # target channel (ck5, ck8, pgp)
                     lowclip_val = 100,  # target channel (ck5, ck8, pgp)
@@ -194,7 +137,6 @@ def collectImgStackFused(f,
     x1, x2  = xcoords[0], xcoords[1]
     y1, y2  = ycoords[0], ycoords[1]
     zlevels = np.arange(zcoords[0], zcoords[1], 1)
-    print(len(zlevels))
 
     tile_str = sch0+sch1+sch2
 
@@ -203,7 +145,6 @@ def collectImgStackFused(f,
 
         # create directory structure
         chan_dir = os.path.join(saveroot, ch[1])
-        print(chan_dir)
         if not os.path.exists(chan_dir):
             os.mkdir(chan_dir)
 
@@ -267,7 +208,6 @@ def collectImgStackFused(f,
                                       y1,
                                       y2) +
                  '{:0>6d}.jpeg'.format(z) for z in zlevels]
-        print(flist[0:20:10])
         
         Tlist = [blockdir_T + os.sep + '%s_%s_pos%s%s_pos%s%s_transpose_' %
                                      (block_name,
@@ -298,17 +238,20 @@ def collectImgStackFused(f,
 
         # read in image chunk for channel
         print('reading img', ch[0])
-        img = f['t00000'][ch[0]]['1/cells'][x1:x2,
-                                            zcoords[0]:zcoords[1],
-                                            y1:y2].astype(np.uint16)
-        img = np.moveaxis(img, 0, 1)
-
+        if orient == 1:
+            img = f['t00000'][ch[0]]['1/cells'][x1:x2,
+                                                zcoords[0]:zcoords[1],
+                                                y1:y2].astype(np.uint16)
+            img = np.moveaxis(img, 0, 1)
+        else:
+            img = f['t00000'][ch[0]]['1/cells'][zcoords[0]:zcoords[1],
+                                                x1:x2,
+                                                y1:y2].astype(np.uint16)
         # do preprocessing on target channel
         if (CLAHE == True) and (ch[0] == target_chan):
             img = __preProcess(img)
             
         elif (CLAHE==False) and (ch[0] == target_chan):
-            print(hiclip_val)
             img = np.clip(img, lowclip_val, hiclip_val)
             img = sk.exposure.rescale_intensity(img, out_range='uint8')
 
