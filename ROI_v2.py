@@ -1,9 +1,10 @@
 from PyQt5.QtWidgets import (
     QMainWindow, QApplication, QDoubleSpinBox, QGridLayout, QWidget, QPushButton,
-    QLabel, QTableWidget, QTableWidgetItem, QMessageBox, QSizePolicy, QComboBox,
+    QLabel, QTableWidget, QTableWidgetItem, QMessageBox, QSizePolicy, QComboBox, QToolButton,
     QSpacerItem, QHBoxLayout, QVBoxLayout, QGroupBox, QLineEdit, QFormLayout, QFileDialog
 )
 
+from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt
 import numpy as np
 import h5py as h5
@@ -13,6 +14,7 @@ from skimage.exposure import equalize_adapthist, rescale_intensity
 import time
 import csv
 import datetime
+import os
 
 """
 
@@ -35,14 +37,13 @@ class MainWindow(QMainWindow):
         left_layout = QVBoxLayout()
         right_layout = QVBoxLayout()
 
-        # Readme Note
+        # Instruction Note
         note_label = QLabel("Quick instruction: \n\
         1. Zoom to desired ROI, input ROI dimension, press 'Crop' \n\
         2. Find manually or press 'Auto Rescale' for optimal contrast clipping values for all 3 channels \n\
-        3. Press 'Save params' to save to .csv file, press 'home' to go back or 'Select File' for another data \n \
+        3. Press 'Save!' to save to .csv file, 'home' to go back or 'Select File' for another data \n \
 You are viewing the 8x downsampled of fused.h5 file. \n \
-Make sure there is enough space when saving params on edges, check x,y and z coords. \n \
-Try not to zoom in smaller than 160x160p for CLAHE. ")
+Make sure there is enough space when saving params on edges, i.e. <12 levels.")
 
         # Loading data label
         self.loading_label = QLabel()
@@ -54,7 +55,13 @@ Try not to zoom in smaller than 160x160p for CLAHE. ")
         self.figure = plt.figure()
         self.canvas = FigureCanvas(self.figure)
         self.canvas.mpl_connect('button_release_event', self.on_zoom_completed)
+
+        # Bottom pannel of the canvas
+        Canvasbottom = QHBoxLayout()
         self.toolbar = NavigationToolbar(self.canvas, self)        
+        self.Abhome_display = QLabel("yoyoyo")
+        Canvasbottom.addWidget(self.toolbar)
+        Canvasbottom.addWidget(self.Abhome_display)
 
         ############ Add button to change between channels ###########
         button_layout = QHBoxLayout()
@@ -70,6 +77,16 @@ Try not to zoom in smaller than 160x160p for CLAHE. ")
         self.target_button.setCheckable(True)
         self.target_button.clicked.connect(self.update_img2target)
         button_layout.addWidget(self.target_button)
+        self.Ab_dropdown = QComboBox()
+        self.Ab_dropdown.addItem("CK5")
+        self.Ab_dropdown.addItem("CK8")
+        self.Ab_dropdown.addItem("PGP9.5")
+        self.Ab_dropdown.addItem("CD31")
+        Ab_dropdown_width = self.Ab_dropdown.sizeHint().width()
+        self.Ab_dropdown.setFixedWidth(Ab_dropdown_width)
+        self.Ab_dropdown.currentIndexChanged.connect(self.Ab_option_changed)
+        button_layout.addWidget(self.Ab_dropdown)
+
         button_container = QGroupBox("Channels")
         button_container.setLayout(button_layout)
         self.setCentralWidget(button_container)
@@ -103,7 +120,7 @@ Try not to zoom in smaller than 160x160p for CLAHE. ")
         auto_rescale_button.clicked.connect(self.Auto_Rescale)
         roi_dim_layout = QHBoxLayout()
         roi_dim_layout.addWidget(roi_dim_label)
-        roi_dim_layout.addWidget(self.roi_dim_textbox)
+        roi_dim_layout.addWidget(self.roi_dim_textbox) 
         button_layout2 = QHBoxLayout()
         button_layout2.addWidget(self.crop_button)
         button_layout2.addWidget(auto_rescale_button)
@@ -206,26 +223,31 @@ Try not to zoom in smaller than 160x160p for CLAHE. ")
         dropdown_container3 = QGroupBox("Target")
         dropdown_container3.setLayout(dropdown_layout3)
 
-        ############# Add Save button and home button ##################
-        file_button = QPushButton("Select File")
+        ############# Add Action buttons at bottom right corner ################
+        file_button = QPushButton("HDF5 File")
         file_button.clicked.connect(self.select_file) 
-        home_button = QPushButton("Home")
-        home_button.clicked.connect(self.go_home)
-        save_button = QPushButton("Save params")
-        save_button.setStyleSheet("QPushButton {padding: 5px; font-weight: bold;}")
+        define_savehome = QPushButton("Save where?")
+        define_savehome.clicked.connect(self.select_savehome) 
+
+        # Override the behavior of the "Reset Original View" button
+        home_button = self.toolbar.actions()[0] #String 0 = "Home" button
+        home_button.triggered.connect(self.go_home)
+
+        save_button = QPushButton(" SAVE ")
+        save_button.setStyleSheet("QPushButton { background-color: green; color: white; padding: 5px; font-weight: bold; }")
         save_button.clicked.connect(self.save_coords)
 
         button_layout = QHBoxLayout()
         button_layout.addWidget(file_button)
-        button_layout.addWidget(home_button)
-        button_layout.addSpacing(20)
+        button_layout.addSpacing(30)
+        button_layout.addWidget(define_savehome)
         button_layout.addWidget(save_button)
         button_layout.addStretch()
 
         # Configure left layout and right layout and make it central
         left_layout.addLayout(note_layout)
         left_layout.addWidget(self.canvas, stretch=1)
-        left_layout.addWidget(self.toolbar)
+        left_layout.addLayout(Canvasbottom)
         left_layout.addWidget(button_container)
         right_layout.addWidget(coordinates_container)
         right_layout.addWidget(button_group)
@@ -244,13 +266,21 @@ Try not to zoom in smaller than 160x160p for CLAHE. ")
         #################################### End of Layout #######################################################
         ##########################################################################################################
 
-        # Initialization
+        # Initialization and initial values
+        self.save_home = os.getcwd()
+        self.ROI_dim = 512
+        self.Antibody = "PGP9.5"
+        self.Ab_home = self.save_home + os.sep + self.Antibody
         self.select_file() # Including readHDF5() and plot_init_z()
 
         # Connect the mouse wheel event to the update_z_level method
         self.canvas.mpl_connect('scroll_event', self.update_z_level)
 
     ##################### Initialization functions  ###########################################
+    
+        """
+        The following will only be run every time you select a new sample
+        """
 
     def readHDF5(self):
     
@@ -273,16 +303,12 @@ Try not to zoom in smaller than 160x160p for CLAHE. ")
 
     def plot_init_z(self):
 
-        """
-        The following will only be run once
-        """
         # Initial params
         self.img = self.cyto
         self.current_chan = "cyto"
         self.vmax = 1200
         self.ClipLowLim = 0
         self.ClipHighLim = 1200
-        self.ROI_dim = 512
 
         # Display current z-level and vol shape
         self.shape = self.img.shape
@@ -430,6 +456,13 @@ Try not to zoom in smaller than 160x160p for CLAHE. ")
 
         self.plot_slice()
 
+    def Ab_option_changed(self):
+        self.Antibody = self.Ab_dropdown.currentText()
+        self.Ab_home = self.save_home + os.sep + self.Antibody
+
+        print("Save directory : ", self.Ab_home)
+        self.show_savedir()
+
     ######################### Cropping ROI and auto rescale ################################
 
     def ROI_dim_changed(self):
@@ -457,8 +490,8 @@ Try not to zoom in smaller than 160x160p for CLAHE. ")
         ystart = int(self.y_limits[1])
         yend = int(self.y_limits[0])
         current_ROI = current_slice[ystart:yend,xstart:xend]
-        p2, p98 = np.percentile(current_ROI, (2,98))
-        p98 = p98*1.1
+        p2, p98 = np.percentile(current_ROI, (2,99))
+        p98 = p98*1.16
         if self.current_chan == "cyto":
             self.ClipHighLim_cyto.setValue(int(p98)) 
             self.ClipLowLim_cyto.setValue(int(p2))
@@ -502,9 +535,9 @@ Try not to zoom in smaller than 160x160p for CLAHE. ")
 
         block = np.clip(block, int(self.ClipLowLim), int(self.ClipHighLim))
         # set clahe kernel size to be 1/4 image size
-        kernel_size = np.asarray([160//4,
-                                  160//4,
-                                  160//4])
+        kernel_size = np.asarray([int(self.ROI_dim)//16, #1/4 kernel size
+                                  int(self.ROI_dim)//16,
+                                  int(self.ROI_dim)//16])
         # equalize histogram and convert to 8 bit
         block = equalize_adapthist(block,
                                    kernel_size=kernel_size,
@@ -544,9 +577,9 @@ Try not to zoom in smaller than 160x160p for CLAHE. ")
             current_slice = self.Rescale(current_slice)
         elif selected_method == "CLAHE":
             xstart = int(self.x_limits[0])
-            xend = xstart + 160
+            xend = xstart + int(self.ROI_dim/4)
             ystart = int(self.y_limits[1])
-            yend = ystart + 160
+            yend = ystart + int(self.ROI_dim/4)
             self.x_limits = [xstart, xend]
             self.y_limits = [yend, ystart]
             block = self.img[:,ystart:yend,xstart:xend]
@@ -579,7 +612,7 @@ Try not to zoom in smaller than 160x160p for CLAHE. ")
         QApplication.processEvents()
 
     def show_saving(self):
-        self.loading_label.setText("Saving selected coords...")
+        self.loading_label.setText("Saving...")
         self.loading_label.setStyleSheet("color: green;")
         QApplication.processEvents()
 
@@ -588,6 +621,11 @@ Try not to zoom in smaller than 160x160p for CLAHE. ")
         self.loading_label.setStyleSheet("color: red;")
         QApplication.processEvents()
 
+    def show_savedir(self):
+        text = "Save directory : " + self.Ab_home
+        self.Abhome_display.setText(text)
+        self.Abhome_display.setStyleSheet("color: orange;")
+        QApplication.processEvents()
 
     ################################ Action buttons ######################################
 
@@ -600,7 +638,7 @@ Try not to zoom in smaller than 160x160p for CLAHE. ")
         """
         file_dialog = QFileDialog()
         # file_dialog.setDirectory("W:/Trilabel_Data")
-        file_path, _ = file_dialog.getOpenFileName(self, "Select File")
+        file_path, _ = file_dialog.getOpenFileName(self, "Select fused HDF5 File")
         if file_path:
             self.h5path = file_path
             print(self.h5path)
@@ -611,7 +649,19 @@ Try not to zoom in smaller than 160x160p for CLAHE. ")
         else: 
             #self.h5path = "W:\\Trilabel_Data\\PGP9.5\\OTLS4_NODO_6-7-23_16-043J_PGP9.5\\data-f0.h5"
             pass
-        
+
+    def select_savehome(self):
+        file_dialog = QFileDialog()
+        savehome = file_dialog.getExistingDirectory(self, "Select save directory")
+        self.save_home = savehome
+        if savehome:
+            if self.Antibody == "":
+                self.Antibody = "PGP9.5"
+            self.Ab_home = savehome + os.sep + self.Antibody
+            print("Save directory : ", self.Ab_home)
+            self.show_savedir()
+        else: 
+            pass
 
     def go_home(self):
         """
@@ -646,11 +696,12 @@ Try not to zoom in smaller than 160x160p for CLAHE. ")
         pgp_clipHigh  = self.ClipHighLim_pgp.value()
         pgp_ctehmt_method = self.dropdown3.currentText()
         h5path = self.h5path
+        Abhome = self.Ab_home
 
-        headers = ["h5path", "xcoord", "ycoord", "zcoord", "ROIdim", "Shape(8xds)",
+        headers = ["h5path", "Abhome", "xcoord", "ycoord", "zcoord", "ROIdim", "Shape(8xds)",
                    "orient", "cyto_clipLow", "cyto_clipHigh", "nuc_clipLow", "nuc_clipHigh",
                    "pgp_ctehmt_method", "pgp_clipLow", "pgp_clipHigh"]
-        values =  [h5path, ycoord, xcoord, currentZ, ROI_dim, shape,
+        values =  [h5path, Abhome, ycoord, xcoord, currentZ, ROI_dim, shape,
                    orient, cyto_clipLow, cyto_clipHigh, nuc_clipLow,
                    nuc_clipHigh, pgp_ctehmt_method, pgp_clipLow, pgp_clipHigh]
 
@@ -662,7 +713,9 @@ Try not to zoom in smaller than 160x160p for CLAHE. ")
                 writer.writerow(headers)
             writer.writerow(values)
         
+        time.sleep(0.2)
         self.hide_text()
+        print("saved")
 
 
 app = QApplication([])
