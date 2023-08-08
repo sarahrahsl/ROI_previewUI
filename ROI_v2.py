@@ -59,7 +59,7 @@ Make sure there is enough space when saving params on edges, i.e. <12 levels.")
         # Bottom pannel of the canvas
         Canvasbottom = QHBoxLayout()
         self.toolbar = NavigationToolbar(self.canvas, self)        
-        self.Abhome_display = QLabel("yoyoyo")
+        self.Abhome_display = QLabel()
         Canvasbottom.addWidget(self.toolbar)
         Canvasbottom.addWidget(self.Abhome_display)
 
@@ -94,17 +94,24 @@ Make sure there is enough space when saving params on edges, i.e. <12 levels.")
         ############# Add x,y,z coordinate display #################
         self.x_coordinate_textbox = QLineEdit()
         self.x_coordinate_textbox.setReadOnly(True)
+        self.x_coordinate_textbox.setStyleSheet("background-color: #f0f0f0;")
         self.y_coordinate_textbox = QLineEdit()
         self.y_coordinate_textbox.setReadOnly(True)
+        self.y_coordinate_textbox.setStyleSheet("background-color: #f0f0f0;")
         self.arrayshape_textbox = QLineEdit()
         self.arrayshape_textbox.setReadOnly(True)
+        self.arrayshape_textbox.setStyleSheet("background-color: #f0f0f0;")
         self.current_z_level_textbox = QLineEdit()
-        self.current_z_level_textbox.setReadOnly(True)
+        self.current_z_level_textbox.setText("0") 
+        self.current_z_level_textbox.returnPressed.connect(self.update_z_level_textbox)
+        # self.current_z_level_textbox.setReadOnly(True)
+        self.note_textbox = QLineEdit()
         form_layout = QFormLayout()
         form_layout.addRow("x-coordinate:", self.x_coordinate_textbox)
         form_layout.addRow("y-coordinate:", self.y_coordinate_textbox)
         form_layout.addRow("Current Z-Level:", self.current_z_level_textbox)
         form_layout.addRow("Vol Dim [z,y,x]:", self.arrayshape_textbox)
+        form_layout.addRow("Note:", self.note_textbox)
         coordinates_container = QGroupBox("Coordinates [3x downsampled]")
         coordinates_container.setLayout(form_layout)
 
@@ -172,7 +179,7 @@ Make sure there is enough space when saving params on edges, i.e. <12 levels.")
         clip_high_layout2 = QHBoxLayout()
         clip_high_layout2.addWidget(QLabel("Clip High:"))
         self.ClipHighLim_nuc = QDoubleSpinBox()
-        self.ClipHighLim_nuc.setRange(0, 5500)
+        self.ClipHighLim_nuc.setRange(0, 10000)
         self.ClipHighLim_nuc.setSingleStep(50)
         self.ClipHighLim_nuc.setValue(ClipHigh_Nuc_default)
         clip_high_layout2.addWidget(self.ClipHighLim_nuc)
@@ -395,6 +402,23 @@ Make sure there is enough space when saving params on edges, i.e. <12 levels.")
                 self.hide_text()
 
             self.plot_slice()
+
+    def update_z_level_textbox(self):
+
+        current_z = int(self.current_z_level_textbox.text())
+
+        if  current_z<0 or current_z> self.shape[0]-1:
+            self.current_z_level_textbox.setText(str(self.current_z_level))
+        else:
+            self.current_z_level = current_z
+
+            if self.current_z_level > self.shape[0] - 13: # out of bound error
+                self.show_OutofBound()
+            else: 
+                self.hide_text()
+
+            self.plot_slice()
+
 
     ########################## Update Channel ##########################################
 
@@ -671,6 +695,8 @@ Make sure there is enough space when saving params on edges, i.e. <12 levels.")
         self.y_limits = [self.shape[1], 0]
         self.dropdown3.setCurrentIndex(0) # change the method to "rescale"
         self.crop_button.setChecked(False)
+        self.y_coordinate_textbox.setText("0")
+        self.x_coordinate_textbox.setText("0")
         self.plot_slice()
 
 
@@ -695,15 +721,16 @@ Make sure there is enough space when saving params on edges, i.e. <12 levels.")
         pgp_clipLow   = self.ClipLowLim_pgp.value()
         pgp_clipHigh  = self.ClipHighLim_pgp.value()
         pgp_ctehmt_method = self.dropdown3.currentText()
+        note = self.note_textbox.text()
         h5path = self.h5path
         Abhome = self.Ab_home
 
         headers = ["h5path", "Abhome", "xcoord", "ycoord", "zcoord", "ROIdim", "Shape(8xds)",
                    "orient", "cyto_clipLow", "cyto_clipHigh", "nuc_clipLow", "nuc_clipHigh",
-                   "pgp_ctehmt_method", "pgp_clipLow", "pgp_clipHigh"]
+                   "pgp_ctehmt_method", "pgp_clipLow", "pgp_clipHigh", "Note"]
         values =  [h5path, Abhome, ycoord, xcoord, currentZ, ROI_dim, shape,
                    orient, cyto_clipLow, cyto_clipHigh, nuc_clipLow,
-                   nuc_clipHigh, pgp_ctehmt_method, pgp_clipLow, pgp_clipHigh]
+                   nuc_clipHigh, pgp_ctehmt_method, pgp_clipLow, pgp_clipHigh, note]
 
         date =  str(datetime.date.today())
         filename = "ROI_coords_" + date + ".csv"
