@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (
 )
 
 from PyQt5.QtGui import QIcon
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QEvent
 import numpy as np
 import h5py as h5
 import matplotlib.pyplot as plt
@@ -229,6 +229,13 @@ Make sure there is enough space when saving params on edges, i.e. <12 levels.")
         dropdown_layout3.addLayout(clip_low_layout3)
         dropdown_container3 = QGroupBox("Target")
         dropdown_container3.setLayout(dropdown_layout3)
+
+        self.ClipHighLim_pgp.installEventFilter(self)
+        self.ClipLowLim_pgp.installEventFilter(self)
+        self.ClipHighLim_cyto.installEventFilter(self)
+        self.ClipLowLim_cyto.installEventFilter(self)
+        self.ClipHighLim_nuc.installEventFilter(self)
+        self.ClipLowLim_nuc.installEventFilter(self)
 
         ############# Add Action buttons at bottom right corner ################
         file_button = QPushButton("HDF5 File")
@@ -480,6 +487,31 @@ Make sure there is enough space when saving params on edges, i.e. <12 levels.")
 
         self.plot_slice()
 
+    def eventFilter(self, obj, event):
+        if obj == self.ClipHighLim_pgp and event.type() == QEvent.MouseButtonPress:
+            if not self.ClipHighLim_pgp.isEnabled():
+                self.update_img2target()
+        if obj == self.ClipLowLim_pgp and event.type() == QEvent.MouseButtonPress:
+            if not self.ClipLowLim_pgp.isEnabled():
+                self.update_img2target()
+
+        if obj == self.ClipHighLim_nuc and event.type() == QEvent.MouseButtonPress:
+            if not self.ClipHighLim_nuc.isEnabled():
+                self.update_img2nuc()
+        if obj == self.ClipLowLim_nuc and event.type() == QEvent.MouseButtonPress:
+            if not self.ClipLowLim_nuc.isEnabled():
+                self.update_img2nuc()
+                    
+        if obj == self.ClipHighLim_cyto and event.type() == QEvent.MouseButtonPress:
+            if not self.ClipHighLim_cyto.isEnabled():
+                self.update_img2cyto()
+        if obj == self.ClipLowLim_cyto and event.type() == QEvent.MouseButtonPress:
+            if not self.ClipLowLim_cyto.isEnabled():
+                self.update_img2cyto()
+    
+        return super().eventFilter(obj, event)
+
+
     def Ab_option_changed(self):
         self.Antibody = self.Ab_dropdown.currentText()
         self.Ab_home = self.save_home + os.sep + self.Antibody
@@ -724,6 +756,11 @@ Make sure there is enough space when saving params on edges, i.e. <12 levels.")
         note = self.note_textbox.text()
         h5path = self.h5path
         Abhome = self.Ab_home
+
+        if xcoord < 0:
+            xcoord = 0
+        if ycoord < 0:
+            ycoord = 0
 
         headers = ["h5path", "Abhome", "xcoord", "ycoord", "zcoord", "ROIdim", "Shape(8xds)",
                    "orient", "cyto_clipLow", "cyto_clipHigh", "nuc_clipLow", "nuc_clipHigh",
