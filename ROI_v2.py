@@ -39,11 +39,11 @@ class MainWindow(QMainWindow):
 
         # Instruction Note
         note_label = QLabel("Quick instruction: \n\
-        1. Zoom to desired ROI, input ROI dimension, press 'Crop' \n\
-        2. Find manually or press 'Auto Rescale' for optimal contrast clipping values for all 3 channels \n\
-        3. Press 'Save!' to save to .csv file, 'home' to go back or 'Select File' for another data \n \
-You are viewing the 8x downsampled of fused.h5 file. \n \
-Make sure there is enough space when saving params on edges, i.e. <12 levels.")
+        1. Change to different channels(Key A, key S and key D). \n\
+        2. Zoom(key Z) to desired ROI, input ROI dimension, press 'Crop'(Key C), drag(Key E) to fine tune ROI. \n\
+        3. Find manually or press 'Auto Rescale'(key R) for optimal contrast clipping values for all 3 channels. \n\
+        4. Press 'Save!' to save to .csv file, 'home'(key F) to go back or 'Select File' for another data. \n \
+You are viewing the 8x downsampled of fused.h5 file. ")
 
         # Loading data label
         self.loading_label = QLabel()
@@ -434,6 +434,7 @@ Make sure there is enough space when saving params on edges, i.e. <12 levels.")
         self.current_chan = "cyto"
         self.ClipLowLim = self.ClipLowLim_cyto.value()
         self.ClipHighLim = self.ClipHighLim_cyto.value()
+        self.cyto_button.setChecked(True)
         self.nuc_button.setChecked(False)  
         self.target_button.setChecked(False)
         self.dropdown1.setEnabled(True)
@@ -453,6 +454,7 @@ Make sure there is enough space when saving params on edges, i.e. <12 levels.")
         self.current_chan = "nuc"
         self.ClipLowLim = self.ClipLowLim_nuc.value()
         self.ClipHighLim = self.ClipHighLim_nuc.value()
+        self.nuc_button.setChecked(True)
         self.cyto_button.setChecked(False)  
         self.target_button.setChecked(False)
         self.dropdown1.setEnabled(False)
@@ -473,6 +475,7 @@ Make sure there is enough space when saving params on edges, i.e. <12 levels.")
         self.current_chan = "Target"
         self.ClipLowLim = self.ClipLowLim_pgp.value()
         self.ClipHighLim = self.ClipHighLim_pgp.value()
+        self.target_button.setChecked(True)
         self.cyto_button.setChecked(False)  
         self.nuc_button.setChecked(False)
         self.dropdown1.setEnabled(False)
@@ -780,6 +783,30 @@ Make sure there is enough space when saving params on edges, i.e. <12 levels.")
         time.sleep(0.2)
         self.hide_text()
         print("saved")
+
+
+    #################################
+    ######## Shortcut Key############
+    #################################
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_A:
+            self.update_img2cyto()
+        if event.key() == Qt.Key_S:
+            self.update_img2nuc()
+        if event.key() == Qt.Key_D:
+            self.update_img2target()
+        if event.key() == Qt.Key_C:
+            self.Crop_ROI()
+        if event.key() == Qt.Key_R:
+            self.Auto_Rescale()
+        if event.key() == Qt.Key_F:
+            self.go_home()
+        if event.key() == Qt.Key_Z:
+            self.toolbar.actions()[5].trigger()  # Zoom in
+        if event.key() == Qt.Key_E:
+            self.toolbar.actions()[4].trigger()  # Drag
+
 
 
 app = QApplication([])
