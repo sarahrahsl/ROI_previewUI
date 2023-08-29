@@ -116,6 +116,10 @@ You are viewing the 8x downsampled of fused.h5 file. ")
         coordinates_container.setLayout(form_layout)
 
         ############ Add ROI dimension textbox, Crop button, and Auto Rescale button ################
+        self.no_of_layer_textbox = QLineEdit()
+        self.no_of_layer_textbox.setText("50")  # Set default to 50 layers
+        self.no_of_layer_textbox.textChanged.connect(self.no_of_layer_changed)
+        no_of_layer_label = QLabel("# of layers to sample")
         self.roi_dim_textbox = QLineEdit()
         self.roi_dim_textbox.setText("512")  # Set default value to 512
         self.roi_dim_textbox.textChanged.connect(self.ROI_dim_changed)
@@ -125,6 +129,9 @@ You are viewing the 8x downsampled of fused.h5 file. ")
         self.crop_button.clicked.connect(self.Crop_ROI)
         auto_rescale_button = QPushButton("Auto Rescale")
         auto_rescale_button.clicked.connect(self.Auto_Rescale)
+        no_of_layer_layout = QHBoxLayout()
+        no_of_layer_layout.addWidget(no_of_layer_label)
+        no_of_layer_layout.addWidget(self.no_of_layer_textbox) 
         roi_dim_layout = QHBoxLayout()
         roi_dim_layout.addWidget(roi_dim_label)
         roi_dim_layout.addWidget(self.roi_dim_textbox) 
@@ -134,6 +141,7 @@ You are viewing the 8x downsampled of fused.h5 file. ")
 
         button_group = QGroupBox("ROI Visualization")
         button_group_layout = QVBoxLayout()
+        button_group_layout.addLayout(no_of_layer_layout)
         button_group_layout.addLayout(roi_dim_layout)
         button_group_layout.addLayout(button_layout2)
         button_group.setLayout(button_group_layout)
@@ -283,6 +291,7 @@ You are viewing the 8x downsampled of fused.h5 file. ")
         # Initialization and initial values
         self.save_home = os.getcwd()
         self.ROI_dim = 512
+        self.no_of_layer = 50
         self.Antibody = "PGP9.5"
         self.Ab_home = self.save_home + os.sep + self.Antibody
         self.select_file() # Including readHDF5() and plot_init_z()
@@ -527,6 +536,9 @@ You are viewing the 8x downsampled of fused.h5 file. ")
     def ROI_dim_changed(self):
         self.ROI_dim = self.roi_dim_textbox.text()
 
+    def no_of_layer_changed(self):
+        self.no_of_layer = self.no_of_layer_textbox.text()
+
     def Crop_ROI(self):
         ROI_dim = float(self.ROI_dim)
         xstart = self.x_limits[0]
@@ -550,7 +562,7 @@ You are viewing the 8x downsampled of fused.h5 file. ")
         yend = int(self.y_limits[0])
         current_ROI = current_slice[ystart:yend,xstart:xend]
         p2, p98 = np.percentile(current_ROI, (2,99))
-        p98 = p98*1.16
+        p98 = p98*1.25
         if self.current_chan == "cyto":
             self.ClipHighLim_cyto.setValue(int(p98)) 
             self.ClipLowLim_cyto.setValue(int(p2))
@@ -738,7 +750,7 @@ You are viewing the 8x downsampled of fused.h5 file. ")
     def save_coords(self):
         """
         This function..
-        - retrieves all the values to be saved
+        - retrieves all the values to be savedROI_dim
         - write it into a .csv file when "Save" button is clicked
         """
         self.show_saving()
@@ -747,6 +759,7 @@ You are viewing the 8x downsampled of fused.h5 file. ")
         ycoord   = int(self.y_limits[1]*4)
         currentZ = int(self.current_z_level*4)
         ROI_dim = int(self.ROI_dim)
+        no_of_layers = int(self.no_of_layer)
         orient = int(self.orient)
         shape    = self.arrayshape_textbox.text()
         cyto_clipLow  = self.ClipLowLim_cyto.value()
@@ -765,10 +778,10 @@ You are viewing the 8x downsampled of fused.h5 file. ")
         if ycoord < 0:
             ycoord = 0
 
-        headers = ["h5path", "Abhome", "xcoord", "ycoord", "zcoord", "ROIdim", "Shape(8xds)",
+        headers = ["h5path", "Abhome", "xcoord", "ycoord", "zcoord", "ROIdim", "No_ofLayers", "Shape(8xds)",
                    "orient", "cyto_clipLow", "cyto_clipHigh", "nuc_clipLow", "nuc_clipHigh",
                    "pgp_ctehmt_method", "pgp_clipLow", "pgp_clipHigh", "Note"]
-        values =  [h5path, Abhome, ycoord, xcoord, currentZ, ROI_dim, shape,
+        values =  [h5path, Abhome, ycoord, xcoord, currentZ, ROI_dim, no_of_layers, shape,
                    orient, cyto_clipLow, cyto_clipHigh, nuc_clipLow,
                    nuc_clipHigh, pgp_ctehmt_method, pgp_clipLow, pgp_clipHigh, note]
 
