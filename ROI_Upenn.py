@@ -1,24 +1,24 @@
 from PyQt5.QtWidgets import (
-    QMainWindow, QApplication, QDoubleSpinBox, QGridLayout, QWidget, QPushButton,
-    QLabel, QTableWidget, QTableWidgetItem, QMessageBox, QSizePolicy, QComboBox, QToolButton,
-    QSpacerItem, QHBoxLayout, QVBoxLayout, QGroupBox, QLineEdit, QFormLayout, QFileDialog
+    QMainWindow, QApplication, QDoubleSpinBox, QWidget, QPushButton, QLabel, QComboBox, 
+    QHBoxLayout, QVBoxLayout, QGroupBox, QLineEdit, QFormLayout, QFileDialog
 )
 
-from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt, QEvent
 import numpy as np
 import h5py as h5
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvas, NavigationToolbar2QT as NavigationToolbar
-from skimage.exposure import equalize_adapthist, rescale_intensity
+from skimage.exposure import equalize_adapthist
 import time
 import csv
 import datetime
 import os
 
+import UI_function as fun
+
 """
 
-Sarah, Jul 2023
+Sarah, Sept 2023
 """
 
 
@@ -30,7 +30,7 @@ class MainWindow(QMainWindow):
         #######################################################################################################
         ############################################## Layout #################################################
 
-        self.setWindowTitle("ROI Preview")
+        self.setWindowTitle("False Color Visualiser for UPenn specimen")
 
         # Create layout for the UI
         main_layout = QHBoxLayout()
@@ -194,7 +194,7 @@ You are viewing the 8x downsampled of the fused data. ")
         dropdown_layout3.addWidget(QLabel("FC style:"))
         self.dropdown3 = QComboBox()
         self.dropdown3.addItem("H&E")
-        self.dropdown3.addItem("IHC")
+        # self.dropdown3.addItem("IHC")
         dropdown_layout3.addWidget(self.dropdown3)
         Nuc_normafactor_layout = QHBoxLayout()
         Nuc_normafactor_layout.addWidget(QLabel("Nuc normfactor:"))
@@ -381,11 +381,6 @@ You are viewing the 8x downsampled of the fused data. ")
             self.current_z_level = current_z_level
             self.current_z_level_textbox.setText(str(self.current_z_level))
 
-            if current_z_level > self.shape[0] - 13: # out of bound error
-                self.show_OutofBound()
-            else: 
-                self.hide_text()
-
             self.plot_slice()
 
     def update_z_level_textbox(self):
@@ -396,11 +391,6 @@ You are viewing the 8x downsampled of the fused data. ")
             self.current_z_level_textbox.setText(str(self.current_z_level))
         else:
             self.current_z_level = current_z
-
-            if self.current_z_level > self.shape[0] - 13: # out of bound error
-                self.show_OutofBound()
-            else: 
-                self.hide_text()
 
             self.plot_slice()
 
@@ -490,81 +480,17 @@ You are viewing the 8x downsampled of the fused data. ")
                 nuc_fc = f['t00000']['s00']['1/cells'][zstart:zend, xstart:xend, ystart:yend].astype(np.uint16)
             f.close()
 
-        cyto_fc = self.FC_rescale(cyto_fc, self.ClipLowLim_cyto.value(), self.ClipHighLim_cyto.value())
-        nuc_fc  = self.FC_rescale(nuc_fc, self.ClipLowLim_nuc.value(), self.ClipHighLim_nuc.value())
+        cyto_fc = fun.FC_rescale(cyto_fc, self.ClipLowLim_cyto.value(), self.ClipHighLim_cyto.value())
+        nuc_fc  = fun.FC_rescale(nuc_fc, self.ClipLowLim_nuc.value(), self.ClipHighLim_nuc.value())
   
         return cyto_fc, nuc_fc
 
-    def getBackgroundLevels(self, image, threshold=50):
-        image_DS = np.sort(image, axis=None)
-        foreground_vals = image_DS[np.where(image_DS > threshold)]
-        hi_val = foreground_vals[int(np.round(len(foreground_vals)*0.95))]
-        background = hi_val / 5
-
-        return hi_val, background
-
-    def FC_rescale(self, image, ClipLow, ClipHigh):
-        
-        Img_rescale = rescale_intensity(np.clip(image, ClipLow, ClipHigh)
-                                        ,out_range=(0,10000)
-                                        )
-
-        return Img_rescale
-    
-    def rapidFieldDivision(self, image, flat_field):
-        """Used for rapidFalseColoring() when flat field has been calculated."""
-        output = np.divide(image, flat_field, where=(flat_field != 0))
-        return output
-
-    def rapidPreProcess(self, image, background, norm_factor):
-        """Background subtraction optimized for CPU."""
-        tmp = image - background
-        tmp[tmp < 0] = 0
-        tmp = (tmp ** 0.85) * (255 / norm_factor)
-        return tmp
-
-    def rapidGetRGBframe(self, nuclei, cyto, nuc_settings, cyto_settings, k_nuclei, k_cyto):
-        """CPU-based exponential false coloring operation."""
-        tmp = nuclei * nuc_settings * k_nuclei + cyto * cyto_settings * k_cyto
-        return 255 * np.exp(-1 * tmp)
-
-    def rapidFalseColor(self, nuclei, cyto, nuc_settings, cyto_settings,
-                        nuc_normfactor=3000, cyto_normfactor=8000,
-                        run_FlatField_nuc=False, 
-                        run_FlatField_cyto=False,
-                        nuc_bg_threshold=50, 
-                        cyto_bg_threshold=50):
-
-        nuclei = np.ascontiguousarray(nuclei, dtype=float)
-        cyto = np.ascontiguousarray(cyto, dtype=float)
-
-        # Set multiplicative constants
-        k_nuclei = 1.0
-        k_cyto = 1.0
-
-        # Run background subtraction or normalization for nuc and cyto
-        if not run_FlatField_nuc:
-            k_nuclei = 0.08
-            nuc_background = self.getBackgroundLevels(nuclei, threshold=nuc_bg_threshold)[1]
-            nuclei = self.rapidPreProcess(nuclei, nuc_background, nuc_normfactor)
-
-        if not run_FlatField_cyto:
-            k_cyto = 0.012
-            cyto_background = self.getBackgroundLevels(cyto, threshold=cyto_bg_threshold)[1]
-            cyto = self.rapidPreProcess(cyto, cyto_background, cyto_normfactor)
-
-        output_global = np.zeros((3, nuclei.shape[0], nuclei.shape[1]), dtype=np.uint8)
-        for i in range(3):
-            output_global[i] = self.rapidGetRGBframe(nuclei, cyto, nuc_settings[i], cyto_settings[i], k_nuclei, k_cyto)
-
-        RGB_image = np.moveaxis(output_global, 0, -1).astype(np.uint8)
-        return RGB_image
 
     ##### Actual FC function #########
     def RunFC_HE(self):
         """Nested in self.Draw_FC() """
         HE_settings = {'nuclei': [0.17, 0.27, 0.105], 'cyto': [0.05, 1.0, 0.54]}
-        pseudoHE = self.rapidFalseColor(self.nuc_fc[0], self.cyto_fc[0], 
+        pseudoHE = fun.rapidFalseColor(self.nuc_fc[0], self.cyto_fc[0], 
                                         HE_settings['nuclei'], HE_settings['cyto'],
                                         nuc_normfactor = self.normfactor_nuc, 
                                         cyto_normfactor = self.normfactor_cyto)
@@ -572,6 +498,7 @@ You are viewing the 8x downsampled of the fused data. ")
 
     def Draw_FC(self):
         self.figure.clear()
+        self.show_false_coloring()
 
         pseudoFC = self.RunFC_HE()
 
@@ -581,6 +508,7 @@ You are viewing the 8x downsampled of the fused data. ")
         ax.axis('off')
 
         self.canvas.draw()
+        self.hide_text()
 
     def normfactor_nuc_change(self):
         self.normfactor_nuc = self.Nuc_normafactor.value()
@@ -663,13 +591,6 @@ You are viewing the 8x downsampled of the fused data. ")
                                    clip_limit=0.01)*255
         return block.astype(np.uint8)
 
-    def Rescale(self, current_slice):
-
-        current_slice = rescale_intensity(np.clip(current_slice,
-                                                  self.ClipLowLim,
-                                                  self.ClipHighLim),
-                                         out_range='uint8')
-        return current_slice
 
     def methodchange(self):
 
@@ -690,7 +611,7 @@ You are viewing the 8x downsampled of the fused data. ")
         selected_method = "Rescale"
 
         if selected_method == "Rescale":
-            current_slice = self.Rescale(current_slice)
+            current_slice = fun.Rescale(current_slice, self.ClipLowLim, self.ClipHighLim)
         elif selected_method == "CLAHE":
             xstart = int(self.x_limits[0])
             xend = xstart + int(self.ROI_dim/4)
@@ -721,6 +642,11 @@ You are viewing the 8x downsampled of the fused data. ")
     def show_loading_data(self):
         self.loading_label.setText("Loading data...")
         self.loading_label.setStyleSheet("color: blue;")
+        QApplication.processEvents()
+
+    def show_false_coloring(self):
+        self.loading_label.setText("False coloring...")
+        self.loading_label.setStyleSheet("color: purple;")
         QApplication.processEvents()
 
     def hide_text(self):
