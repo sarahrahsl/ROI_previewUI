@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import (
     QSpacerItem, QHBoxLayout, QVBoxLayout, QGroupBox, QLineEdit, QFormLayout, QFileDialog
 )
 
-from PyQt5.QtGui import QIcon
+from PyQt5.QtGui import QIcon, QIntValidator
 from PyQt5.QtCore import Qt, QEvent
 import numpy as np
 import h5py as h5
@@ -41,17 +41,24 @@ class MainWindow(QMainWindow):
 
         # Instruction Note
         note_label = QLabel("Quick instruction: \n\
-        1. Change to different channels(Key A, key S and key D). \n\
+        1. Change to different channels(Key A, key S, key D, and key F). \n\
         2. Zoom(key Z) to desired ROI, input ROI dimension, press 'Crop'(Key C), drag(Key E) to fine tune ROI. \n\
         3. Find manually or press 'Auto Rescale'(key R) for optimal contrast clipping values for all 3 channels. \n\
         4. Press 'Save!' to save to .csv file, 'home'(key F) to go back or 'Select File' for another data. \n \
 You are viewing the 8x downsampled of fused.h5 file. ")
+        note_label.setFixedWidth(600)
 
         # Loading data label
         self.loading_label = QLabel()
-        note_layout = QHBoxLayout()
-        note_layout.addWidget(note_label, alignment=Qt.AlignTop | Qt.AlignLeft)
-        note_layout.addWidget(self.loading_label, alignment=Qt.AlignBottom | Qt.AlignRight)
+        startup_layout = QHBoxLayout()
+        h5_msg_layout = QVBoxLayout()
+        file_button = QPushButton("H5 File")
+        file_button.setFixedWidth(90)
+        file_button.clicked.connect(self.select_file) 
+        h5_msg_layout.addWidget(file_button, alignment=Qt.AlignBottom)
+        h5_msg_layout.addWidget(self.loading_label, alignment=Qt.AlignBottom | Qt.AlignRight)
+        startup_layout.addWidget(note_label, alignment=Qt.AlignTop | Qt.AlignLeft)
+        startup_layout.addLayout(h5_msg_layout)
 
         # Create a matplotlib figure
         self.figure = plt.figure()
@@ -61,12 +68,13 @@ You are viewing the 8x downsampled of fused.h5 file. ")
         # Bottom pannel of the canvas
         Canvasbottom = QHBoxLayout()
         self.toolbar = NavigationToolbar(self.canvas, self)        
-        self.Abhome_display = QLabel()
+        self.Abhome_display = QLabel("Choose your 'train' folder directory for your ROI to be saved.")
+        self.Abhome_display.setStyleSheet("color: red;")
         Canvasbottom.addWidget(self.toolbar)
         Canvasbottom.addWidget(self.Abhome_display)
 
         ############### Add channel buttons and false-coloring button ##############
-        channel_button_group = QGroupBox("Channels")
+
         channel_button_layout = QHBoxLayout()
         self.cyto_button = QPushButton("Cyto")
         self.cyto_button.setCheckable(True)
@@ -80,57 +88,15 @@ You are viewing the 8x downsampled of fused.h5 file. ")
         self.target_button.setCheckable(True)
         self.target_button.clicked.connect(self.update_img2target)
         channel_button_layout.addWidget(self.target_button)
-        self.Ab_dropdown = QComboBox()
-        self.Ab_dropdown.addItem("CK5")
-        self.Ab_dropdown.addItem("CK8")
-        self.Ab_dropdown.addItem("PGP9.5")
-        self.Ab_dropdown.addItem("CD31")
-        Ab_dropdown_width = self.Ab_dropdown.sizeHint().width()
-        self.Ab_dropdown.setFixedWidth(Ab_dropdown_width)
-        self.Ab_dropdown.currentIndexChanged.connect(self.Ab_option_changed)
-        channel_button_layout.addWidget(self.Ab_dropdown)
+        self.FC_button = QPushButton("False Color")
+        self.FC_button.setStyleSheet("QPushButton { color: purple; }")
+        self.FC_button.setCheckable(True)
+        self.FC_button.clicked.connect(self.update_img2FC)
+        channel_button_layout.addWidget(self.FC_button)
 
-        channel_button_group.setLayout(channel_button_layout)
-        self.setCentralWidget(channel_button_group)
-
-        # Create a False-coloring button group
-        false_coloring_group = QGroupBox("False-coloring")
-        he_button = QPushButton("H&E")
-        ihc_button = QPushButton("IHC")
-        he_button.clicked.connect(self.RunFC_HE)
-        ihc_button.clicked.connect(self.RunFC_IHC)
-        FC_normfactor1_label = QLabel("Normfactor1:")
-        FC_normfactor2_label = QLabel("Normfactor2:")
-        self.FC_normfactor1 = QDoubleSpinBox() #nuc
-        self.FC_normfactor1.setRange(0, 10000)
-        self.FC_normfactor1.setSingleStep(500)
-        self.FC_normfactor1.setValue(3000)
-        self.FC_normfactor2 = QDoubleSpinBox() #cyto
-        self.FC_normfactor2.setRange(0, 10000)
-        self.FC_normfactor2.setSingleStep(500)
-        self.FC_normfactor2.setValue(8000)
-        he_layout = QVBoxLayout()
-        he_layout.addWidget(he_button)
-        he_layout.addWidget(FC_normfactor1_label)
-        he_layout.addWidget(self.FC_normfactor1)
-        ihc_layout = QVBoxLayout()
-        ihc_layout.addWidget(ihc_button)
-        ihc_layout.addWidget(FC_normfactor2_label)
-        ihc_layout.addWidget(self.FC_normfactor2)
-        self.FC_normfactor1.valueChanged.connect(self.normfactor1_change)
-        self.FC_normfactor2.valueChanged.connect(self.normfactor2_change)
-
-        # Create a horizontal layout for combining the button-spinbox pairs
-        FC_layout = QHBoxLayout()
-        FC_layout.addLayout(he_layout)  # Add the H&E pair
-        FC_layout.addLayout(ihc_layout)  # Add the IHC pair
-        false_coloring_group.setLayout(FC_layout)
-
-        # Create the main layout containing channel_button_group and false_coloring_group
-        channel_and_fc_layout = QHBoxLayout()
-        channel_and_fc_layout.addWidget(channel_button_group, 85)
-        channel_and_fc_layout.addWidget(false_coloring_group, 15)
-
+        channel_button_container = QGroupBox("Channels")
+        channel_button_container.setLayout(channel_button_layout)
+        self.setCentralWidget(channel_button_container)
 
         ############# Add x,y,z coordinate display #################
         self.x_coordinate_textbox = QLineEdit()
@@ -142,8 +108,10 @@ You are viewing the 8x downsampled of fused.h5 file. ")
         self.arrayshape_textbox = QLineEdit()
         self.arrayshape_textbox.setReadOnly(True)
         self.arrayshape_textbox.setStyleSheet("background-color: #f0f0f0;")
+        validator = QIntValidator()
         self.current_z_level_textbox = QLineEdit()
-        self.current_z_level_textbox.setText("0") 
+        self.current_z_level_textbox.setText("0")
+        self.current_z_level_textbox.setValidator(validator)
         self.current_z_level_textbox.returnPressed.connect(self.update_z_level_textbox)
         # self.current_z_level_textbox.setReadOnly(True)
         self.note_textbox = QLineEdit()
@@ -158,7 +126,8 @@ You are viewing the 8x downsampled of fused.h5 file. ")
 
         ############ Add ROI dimension textbox, Crop button, and Auto Rescale button ################
         self.no_of_layer_textbox = QLineEdit()
-        self.no_of_layer_textbox.setText("50")  # Set default to 50 layers
+        self.no_of_layer_textbox.setText("12")  # Set default to 50 layers
+        self.no_of_layer_textbox.setValidator(validator)
         self.no_of_layer_textbox.textChanged.connect(self.no_of_layer_changed)
         no_of_layer_label = QLabel("# of layers to sample")
         self.roi_dim_textbox = QLineEdit()
@@ -191,7 +160,6 @@ You are viewing the 8x downsampled of fused.h5 file. ")
         ClipLow_Cyto_default = 0
         ClipHigh_Cyto_default = 1200
         dropdown_layout1 = QVBoxLayout()
-        dropdown_layout1.addWidget(QLabel("Contrast Enhancement Method:"))
         self.dropdown1 = QComboBox()
         self.dropdown1.addItem("Rescale")
         dropdown_layout1.addWidget(self.dropdown1)
@@ -221,7 +189,6 @@ You are viewing the 8x downsampled of fused.h5 file. ")
         ClipLow_Nuc_default = 0
         ClipHigh_Nuc_default = 2000
         dropdown_layout2 = QVBoxLayout()
-        dropdown_layout2.addWidget(QLabel("Contrast Enhancement Method:"))
         self.dropdown2 = QComboBox()
         self.dropdown2.addItem("Rescale")
         dropdown_layout2.addWidget(self.dropdown2)
@@ -251,7 +218,6 @@ You are viewing the 8x downsampled of fused.h5 file. ")
         ClipLow_PGP_default = 0
         ClipHigh_PGP_default = 700
         dropdown_layout3 = QVBoxLayout()
-        dropdown_layout3.addWidget(QLabel("Contrast Enhancement Method:"))
         self.dropdown3 = QComboBox()
         self.dropdown3.addItem("Rescale")
         self.dropdown3.addItem("CLAHE")
@@ -279,6 +245,42 @@ You are viewing the 8x downsampled of fused.h5 file. ")
         dropdown_container3 = QGroupBox("Target")
         dropdown_container3.setLayout(dropdown_layout3)
 
+        ############### Add Norm1, Norm2 for FC channel #################
+
+        dropdown_layout4 = QVBoxLayout()
+
+        FC_style_layout = QHBoxLayout()
+        self.dropdown4 = QComboBox()
+        self.dropdown4.addItem("H&E")
+        self.dropdown4.addItem("IHC")
+        self.dropdown4.currentIndexChanged.connect(self.style_change)
+        FC_style_layout.addWidget(QLabel("FC style:"))
+        FC_style_layout.addWidget(self.dropdown4)
+    
+        Nuc_normfactor_layout = QHBoxLayout()
+        Nuc_normfactor_layout.addWidget(QLabel("Nuc normfactor:"))
+        self.Nuc_normfactor = QDoubleSpinBox()
+        self.Nuc_normfactor.setRange(0, 15000)
+        self.Nuc_normfactor.setSingleStep(500)
+        self.Nuc_normfactor.setValue(5000)
+        Nuc_normfactor_layout.addWidget(self.Nuc_normfactor)
+        Cyto_normfactor_layout = QHBoxLayout()
+        Cyto_normfactor_layout.addWidget(QLabel("Cyto/ihc normfactor:"))
+        self.Cyto_normfactor = QDoubleSpinBox()
+        self.Cyto_normfactor.setRange(0, 15000)
+        self.Cyto_normfactor.setSingleStep(500)
+        self.Cyto_normfactor.setValue(8000) 
+        Cyto_normfactor_layout.addWidget(self.Cyto_normfactor)
+
+        self.Cyto_normfactor.valueChanged.connect(self.normfactor_cyto_change)
+        self.Nuc_normfactor.valueChanged.connect(self.normfactor_nuc_change)
+
+        dropdown_layout4.addLayout(FC_style_layout)
+        dropdown_layout4.addLayout(Nuc_normfactor_layout)
+        dropdown_layout4.addLayout(Cyto_normfactor_layout)
+        dropdown_container4 = QGroupBox("False-coloring")
+        dropdown_container4.setLayout(dropdown_layout4)
+
         self.ClipHighLim_pgp.installEventFilter(self)
         self.ClipLowLim_pgp.installEventFilter(self)
         self.ClipHighLim_cyto.installEventFilter(self)
@@ -287,36 +289,46 @@ You are viewing the 8x downsampled of fused.h5 file. ")
         self.ClipLowLim_nuc.installEventFilter(self)
 
         ############# Add Action buttons at bottom right corner ################
-        file_button = QPushButton("HDF5 File")
-        file_button.clicked.connect(self.select_file) 
-        define_savehome = QPushButton("Save where?")
+        define_savehome = QPushButton("'Train' root")
         define_savehome.clicked.connect(self.select_savehome) 
 
         # Override the behavior of the "Reset Original View" button
         home_button = self.toolbar.actions()[0] #String 0 = "Home" button
         home_button.triggered.connect(self.go_home)
 
+        # Save home button
+        self.Ab_dropdown = QComboBox()
+        self.Ab_dropdown.addItem("CK5")
+        self.Ab_dropdown.addItem("CK8")
+        self.Ab_dropdown.addItem("PGP9.5")
+        self.Ab_dropdown.addItem("CD31")
+        Ab_dropdown_width = self.Ab_dropdown.sizeHint().width()
+        self.Ab_dropdown.setFixedWidth(Ab_dropdown_width)
+        self.Ab_dropdown.currentIndexChanged.connect(self.Ab_option_changed)
+
+        # Save button
         save_button = QPushButton(" SAVE ")
         save_button.setStyleSheet("QPushButton { background-color: green; color: white; padding: 5px; font-weight: bold; }")
         save_button.clicked.connect(self.save_coords)
 
+        # Configure action button layout
         action_button_layout = QHBoxLayout()
-        action_button_layout.addWidget(file_button)
-        action_button_layout.addSpacing(30)
+        action_button_layout.addWidget(self.Ab_dropdown)
         action_button_layout.addWidget(define_savehome)
         action_button_layout.addWidget(save_button)
         action_button_layout.addStretch()
 
         # Configure left layout and right layout and make it central
-        left_layout.addLayout(note_layout)
+        left_layout.addLayout(startup_layout)
         left_layout.addWidget(self.canvas, stretch=1)
         left_layout.addLayout(Canvasbottom)
-        left_layout.addLayout(channel_and_fc_layout)
+        left_layout.addWidget(channel_button_container)
         right_layout.addWidget(coordinates_container)
         right_layout.addWidget(button_group)
         right_layout.addWidget(dropdown_container1)
         right_layout.addWidget(dropdown_container2)
         right_layout.addWidget(dropdown_container3)
+        right_layout.addWidget(dropdown_container4)
         right_layout.addLayout(action_button_layout)
         main_layout.addLayout(left_layout, stretch=80)
         main_layout.addLayout(right_layout,stretch=20)
@@ -332,10 +344,10 @@ You are viewing the 8x downsampled of fused.h5 file. ")
         # Initialization and initial values
         self.save_home = os.getcwd()
         self.ROI_dim = 512
-        self.no_of_layer = 50
+        self.no_of_layer = 12
         self.Antibody = "PGP9.5"
-        self.normfactor1 = 8000
-        self.normfactor2 = 5000
+        self.normfactor_nuc = 8000
+        self.normfactor_cyto = 5000
         self.Ab_home = self.save_home + os.sep + self.Antibody
         self.select_file() # Including readHDF5() and plot_init_z()
 
@@ -489,15 +501,19 @@ You are viewing the 8x downsampled of fused.h5 file. ")
         self.cyto_button.setChecked(True)
         self.nuc_button.setChecked(False)  
         self.target_button.setChecked(False)
+        self.FC_button.setChecked(False)
         self.dropdown1.setEnabled(True)
         self.dropdown2.setEnabled(False)  
         self.dropdown3.setEnabled(False)  
+        self.dropdown4.setEnabled(False)
         self.ClipHighLim_cyto.setEnabled(True)  
         self.ClipLowLim_cyto.setEnabled(True)
         self.ClipHighLim_nuc.setEnabled(False)  
         self.ClipLowLim_nuc.setEnabled(False) 
         self.ClipHighLim_pgp.setEnabled(False) 
         self.ClipLowLim_pgp.setEnabled(False)
+        self.Cyto_normfactor.setEnabled(False)
+        self.Nuc_normfactor.setEnabled(False)
 
         self.plot_slice()
 
@@ -509,15 +525,19 @@ You are viewing the 8x downsampled of fused.h5 file. ")
         self.nuc_button.setChecked(True)
         self.cyto_button.setChecked(False)  
         self.target_button.setChecked(False)
+        self.FC_button.setChecked(False)
         self.dropdown1.setEnabled(False)
         self.dropdown2.setEnabled(True)
         self.dropdown3.setEnabled(False)  
+        self.dropdown4.setEnabled(False)
         self.ClipHighLim_nuc.setEnabled(True)  
         self.ClipLowLim_nuc.setEnabled(True)
         self.ClipHighLim_cyto.setEnabled(False)  
         self.ClipLowLim_cyto.setEnabled(False) 
         self.ClipHighLim_pgp.setEnabled(False) 
         self.ClipLowLim_pgp.setEnabled(False)
+        self.Cyto_normfactor.setEnabled(False)
+        self.Nuc_normfactor.setEnabled(False)
 
         self.plot_slice()
 
@@ -530,17 +550,42 @@ You are viewing the 8x downsampled of fused.h5 file. ")
         self.target_button.setChecked(True)
         self.cyto_button.setChecked(False)  
         self.nuc_button.setChecked(False)
+        self.FC_button.setChecked(False)
         self.dropdown1.setEnabled(False)
         self.dropdown2.setEnabled(False)  
         self.dropdown3.setEnabled(True)
+        self.dropdown4.setEnabled(False)
         self.ClipHighLim_pgp.setEnabled(True)  
         self.ClipLowLim_pgp.setEnabled(True)
         self.ClipHighLim_nuc.setEnabled(False) 
         self.ClipLowLim_nuc.setEnabled(False) 
         self.ClipHighLim_cyto.setEnabled(False)
         self.ClipLowLim_cyto.setEnabled(False)  
+        self.Cyto_normfactor.setEnabled(False)
+        self.Nuc_normfactor.setEnabled(False)
 
         self.plot_slice()
+
+    def update_img2FC(self):
+        self.FC_button.setChecked(True)
+        self.nuc_button.setChecked(False)
+        self.cyto_button.setChecked(False)  
+        self.target_button.setChecked(False)
+        self.dropdown1.setEnabled(False)
+        self.dropdown2.setEnabled(False)
+        self.dropdown3.setEnabled(False)
+        self.dropdown4.setEnabled(True)
+        self.ClipHighLim_nuc.setEnabled(False)  
+        self.ClipLowLim_nuc.setEnabled(False)
+        self.ClipHighLim_cyto.setEnabled(False)  
+        self.ClipLowLim_cyto.setEnabled(False) 
+        self.ClipHighLim_pgp.setEnabled(False)
+        self.ClipLowLim_pgp.setEnabled(False)
+        self.Nuc_normfactor.setEnabled(True)
+        self.Cyto_normfactor.setEnabled(True)
+
+        self.cyto_fc, self.nuc_fc, self.pgp_fc = self.readHDF5_FC()
+        self.Draw_FC()
 
     def eventFilter(self, obj, event):
         if obj == self.ClipHighLim_pgp and event.type() == QEvent.MouseButtonPress:
@@ -595,7 +640,6 @@ You are viewing the 8x downsampled of fused.h5 file. ")
             cyto_fc = np.moveaxis(cyto_fc, 0, 1)
             nuc_fc = np.moveaxis(nuc_fc, 0, 1)
             pgp_fc = np.moveaxis(pgp_fc, 0, 1)
-            print(cyto_fc.shape)
         else:
             with h5.File(self.h5path, 'r') as f:
                 cyto_fc = f['t00000']['s00']['1/cells'][zstart:zend, xstart:xend, ystart:yend].astype(np.uint16)
@@ -610,26 +654,29 @@ You are viewing the 8x downsampled of fused.h5 file. ")
         return cyto_fc, nuc_fc, pgp_fc
 
     def RunFC_HE(self):
-        cyto_fc, nuc_fc, _ = self.readHDF5_FC()
-        HE_settings = {'nuclei': [0.17, 0.27, 0.105], 'cyto': [0.05, 1.0, 0.54]}
-        pseudoHE = fun.rapidFalseColor(nuc_fc[0], cyto_fc[0], 
-                                        HE_settings['nuclei'], HE_settings['cyto'],
-                                        nuc_normfactor = self.normfactor1, 
-                                        cyto_normfactor = self.normfactor2)
 
-        self.Draw_FC(pseudoFC=pseudoHE)
+        HE_settings = {'nuclei': [0.17, 0.27, 0.105], 'cyto': [0.05, 1.0, 0.54]}
+        pseudoHE = fun.rapidFalseColor(self.nuc_fc[0], self.cyto_fc[0], 
+                                        HE_settings['nuclei'], HE_settings['cyto'],
+                                        nuc_normfactor = self.normfactor_nuc, 
+                                        cyto_normfactor = self.normfactor_cyto)
+        return pseudoHE
 
     def RunFC_IHC(self):
-        _, nuc_fc, pgp_fc = self.readHDF5_FC()
-        IHC_settings = {'nuclei': [0.65, 0.45, 0.15], 'anti': [0.4, 0.7, 0.9]}
-        pseudoIHC = fun.rapidFalseColor(nuc_fc[0], pgp_fc[0], 
-                                         IHC_settings['nuclei'], IHC_settings['anti'],
-                                         nuc_normfactor = self.normfactor1, 
-                                         cyto_normfactor = self.normfactor2) #ihc
-        self.Draw_FC(pseudoFC=pseudoIHC)
 
-    def Draw_FC(self, pseudoFC):
+        IHC_settings = {'nuclei': [0.65, 0.45, 0.15], 'anti': [0.4, 0.7, 0.9]}
+        pseudoIHC = fun.rapidFalseColor(self.nuc_fc[0], self.pgp_fc[0], 
+                                         IHC_settings['nuclei'], IHC_settings['anti'],
+                                         nuc_normfactor = self.normfactor_nuc, 
+                                         cyto_normfactor = self.normfactor_cyto) #ihc
+        return pseudoIHC
+
+    def Draw_FC(self):
         self.figure.clear()
+        if self.dropdown4.currentText() == "H&E":
+            pseudoFC = self.RunFC_HE()
+        else:
+            pseudoFC = self.RunFC_IHC()
         vmax = np.percentile(pseudoFC,99)
         ax = self.figure.add_subplot(111)
         ax.imshow(pseudoFC, cmap='viridis', vmax=vmax)
@@ -637,11 +684,18 @@ You are viewing the 8x downsampled of fused.h5 file. ")
 
         self.canvas.draw()
 
-    def normfactor1_change(self):
-        self.normfactor1 = self.FC_normfactor1.value()
+    def normfactor_nuc_change(self):
+        self.normfactor_nuc = self.Nuc_normfactor.value()
+        self.Draw_FC()
 
-    def normfactor2_change(self):
-        self.normfactor2 = self.FC_normfactor2.value()
+    def normfactor_cyto_change(self):
+        self.normfactor_cyto = self.Cyto_normfactor.value()
+        self.Draw_FC()
+
+    def style_change(self):
+
+        self.Draw_FC()
+
 
     ######################### Cropping ROI and auto rescale ################################
 
@@ -809,7 +863,7 @@ You are viewing the 8x downsampled of fused.h5 file. ")
         QApplication.processEvents()
 
     def show_savedir(self):
-        text = "Save directory : " + self.Ab_home
+        text = "Save dir : " + self.Ab_home
         self.Abhome_display.setText(text)
         self.Abhome_display.setStyleSheet("color: orange;")
         QApplication.processEvents()
@@ -900,9 +954,10 @@ You are viewing the 8x downsampled of fused.h5 file. ")
         values =  [h5path, Abhome, ycoord, xcoord, currentZ, ROI_dim, no_of_layers, shape,
                    orient, cyto_clipLow, cyto_clipHigh, nuc_clipLow,
                    nuc_clipHigh, pgp_ctehmt_method, pgp_clipLow, pgp_clipHigh, note]
-
+        if not os.path.exists("./coords"):
+            os.mkdir("./coords")
         date =  str(datetime.date.today())
-        filename = "ROI_coords_" + date + ".csv"
+        filename = "./coords" + os.sep + "ROI_coords_" + date + ".csv"
         with open(filename, mode="a", newline="") as file:
             writer = csv.writer(file)
             if file.tell() == 0:
@@ -925,11 +980,13 @@ You are viewing the 8x downsampled of fused.h5 file. ")
             self.update_img2nuc()
         if event.key() == Qt.Key_D:
             self.update_img2target()
+        if event.key() == Qt.Key_F:
+            self.update_img2FC()
         if event.key() == Qt.Key_C:
             self.Crop_ROI()
         if event.key() == Qt.Key_R:
             self.Auto_Rescale()
-        if event.key() == Qt.Key_F:
+        if event.key() == Qt.Key_Q:
             self.go_home()
         if event.key() == Qt.Key_Z:
             self.toolbar.actions()[5].trigger()  # Zoom in
