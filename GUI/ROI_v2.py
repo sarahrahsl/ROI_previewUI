@@ -19,7 +19,7 @@ import os
 import UI_function as fun
 
 """
-
+For cropping ROIs and false coloring
 Sarah, Jul 2023
 """
 
@@ -52,10 +52,6 @@ You are viewing the 8x downsampled of fused.h5 file. ")
         self.loading_label = QLabel()
         startup_layout = QHBoxLayout()
         h5_msg_layout = QVBoxLayout()
-        file_button = QPushButton("H5 File")
-        file_button.setFixedWidth(90)
-        file_button.clicked.connect(self.select_file) 
-        h5_msg_layout.addWidget(file_button, alignment=Qt.AlignBottom)
         h5_msg_layout.addWidget(self.loading_label, alignment=Qt.AlignBottom | Qt.AlignRight)
         startup_layout.addWidget(note_label, alignment=Qt.AlignTop | Qt.AlignLeft)
         startup_layout.addLayout(h5_msg_layout)
@@ -121,7 +117,7 @@ You are viewing the 8x downsampled of fused.h5 file. ")
         form_layout.addRow("Current Z-Level:", self.current_z_level_textbox)
         form_layout.addRow("Vol Dim [z,y,x]:", self.arrayshape_textbox)
         form_layout.addRow("Note:", self.note_textbox)
-        coordinates_container = QGroupBox("Coordinates [3x downsampled]")
+        coordinates_container = QGroupBox("Coordinates [8x downsampled]")
         coordinates_container.setLayout(form_layout)
 
         ############ Add ROI dimension textbox, Crop button, and Auto Rescale button ################
@@ -260,14 +256,14 @@ You are viewing the 8x downsampled of fused.h5 file. ")
         Nuc_normfactor_layout = QHBoxLayout()
         Nuc_normfactor_layout.addWidget(QLabel("Nuc normfactor:"))
         self.Nuc_normfactor = QDoubleSpinBox()
-        self.Nuc_normfactor.setRange(0, 15000)
+        self.Nuc_normfactor.setRange(500, 15000)
         self.Nuc_normfactor.setSingleStep(500)
         self.Nuc_normfactor.setValue(5000)
         Nuc_normfactor_layout.addWidget(self.Nuc_normfactor)
         Cyto_normfactor_layout = QHBoxLayout()
         Cyto_normfactor_layout.addWidget(QLabel("Cyto/ihc normfactor:"))
         self.Cyto_normfactor = QDoubleSpinBox()
-        self.Cyto_normfactor.setRange(0, 15000)
+        self.Cyto_normfactor.setRange(500, 15000)
         self.Cyto_normfactor.setSingleStep(500)
         self.Cyto_normfactor.setValue(8000) 
         Cyto_normfactor_layout.addWidget(self.Cyto_normfactor)
@@ -289,22 +285,16 @@ You are viewing the 8x downsampled of fused.h5 file. ")
         self.ClipLowLim_nuc.installEventFilter(self)
 
         ############# Add Action buttons at bottom right corner ################
+        file_button = QPushButton("HDF5 File")
+        file_button.setFixedWidth(90)
+        file_button.clicked.connect(self.select_file) 
+
         define_savehome = QPushButton("'Train' root")
         define_savehome.clicked.connect(self.select_savehome) 
 
         # Override the behavior of the "Reset Original View" button
         home_button = self.toolbar.actions()[0] #String 0 = "Home" button
         home_button.triggered.connect(self.go_home)
-
-        # Save home button
-        self.Ab_dropdown = QComboBox()
-        self.Ab_dropdown.addItem("CK5")
-        self.Ab_dropdown.addItem("CK8")
-        self.Ab_dropdown.addItem("PGP9.5")
-        self.Ab_dropdown.addItem("CD31")
-        Ab_dropdown_width = self.Ab_dropdown.sizeHint().width()
-        self.Ab_dropdown.setFixedWidth(Ab_dropdown_width)
-        self.Ab_dropdown.currentIndexChanged.connect(self.Ab_option_changed)
 
         # Save button
         save_button = QPushButton(" SAVE ")
@@ -313,7 +303,7 @@ You are viewing the 8x downsampled of fused.h5 file. ")
 
         # Configure action button layout
         action_button_layout = QHBoxLayout()
-        action_button_layout.addWidget(self.Ab_dropdown)
+        action_button_layout.addWidget(file_button)
         action_button_layout.addWidget(define_savehome)
         action_button_layout.addWidget(save_button)
         action_button_layout.addStretch()
@@ -342,13 +332,11 @@ You are viewing the 8x downsampled of fused.h5 file. ")
         ##########################################################################################################
 
         # Initialization and initial values
-        self.save_home = os.getcwd()
+        self.Ab_home = os.getcwd()
         self.ROI_dim = 512
         self.no_of_layer = 12
-        self.Antibody = "PGP9.5"
         self.normfactor_nuc = 8000
         self.normfactor_cyto = 5000
-        self.Ab_home = self.save_home + os.sep + self.Antibody
         self.select_file() # Including readHDF5() and plot_init_z()
 
         # Connect the mouse wheel event to the update_z_level method
@@ -408,6 +396,7 @@ You are viewing the 8x downsampled of fused.h5 file. ")
         self.cyto_button.setChecked(True)
         self.nuc_button.setChecked(False)  
         self.target_button.setChecked(False)
+        self.FC_button.setChecked(False)
         self.dropdown1.setEnabled(True)
         self.dropdown2.setEnabled(False)  
         self.dropdown3.setEnabled(False)  
@@ -454,6 +443,7 @@ You are viewing the 8x downsampled of fused.h5 file. ")
         if event.button == 'up' or event.button == 'down':
 
             current_z_level = self.current_z_level
+            self.FC_button.setChecked(False)
             # Update the z-level based on the scroll direction
             if event.button == 'up':
                 current_z_level += 1
@@ -610,14 +600,6 @@ You are viewing the 8x downsampled of fused.h5 file. ")
                 self.update_img2cyto()
     
         return super().eventFilter(obj, event)
-
-
-    def Ab_option_changed(self):
-        self.Antibody = self.Ab_dropdown.currentText()
-        self.Ab_home = self.save_home + os.sep + self.Antibody
-
-        print("Save directory : ", self.Ab_home)
-        self.show_savedir()
 
 
     #################################### False-coloring ####################################
@@ -894,11 +876,8 @@ You are viewing the 8x downsampled of fused.h5 file. ")
     def select_savehome(self):
         file_dialog = QFileDialog()
         savehome = file_dialog.getExistingDirectory(self, "Select save directory")
-        self.save_home = savehome
         if savehome:
-            if self.Antibody == "":
-                self.Antibody = "PGP9.5"
-            self.Ab_home = savehome + os.sep + self.Antibody
+            self.Ab_home = savehome
             print("Save directory : ", self.Ab_home)
             self.show_savedir()
         else: 
@@ -954,10 +933,10 @@ You are viewing the 8x downsampled of fused.h5 file. ")
         values =  [h5path, Abhome, ycoord, xcoord, currentZ, ROI_dim, no_of_layers, shape,
                    orient, cyto_clipLow, cyto_clipHigh, nuc_clipLow,
                    nuc_clipHigh, pgp_ctehmt_method, pgp_clipLow, pgp_clipHigh, note]
-        if not os.path.exists("./coords"):
-            os.mkdir("./coords")
+        if not os.path.exists("../coords"):
+            os.mkdir("../coords")
         date =  str(datetime.date.today())
-        filename = "./coords" + os.sep + "ROI_coords_" + date + ".csv"
+        filename = "../coords" + os.sep + "ROI_coords_" + date + ".csv"
         with open(filename, mode="a", newline="") as file:
             writer = csv.writer(file)
             if file.tell() == 0:

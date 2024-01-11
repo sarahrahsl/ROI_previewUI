@@ -1,0 +1,9 @@
+# Ignore all the CSV and TXT files
+
+*.csv
+*.txt
+Old coords/*
+Utility/*
+.ipynb_checkpoints/
+**/__pycache__/
+

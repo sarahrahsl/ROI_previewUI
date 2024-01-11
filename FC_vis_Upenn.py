@@ -13,6 +13,7 @@ import time
 import csv
 import datetime
 import os
+from tqdm import tqdm
 
 import UI_function as fun
 
@@ -39,18 +40,29 @@ class MainWindow(QMainWindow):
 
         # Instruction Note
         note_label = QLabel("Quick instruction: \n\
-        1. Change to different channels(Key A, key S). \n\
+        1. Change to different channels(Key A, key S, key D). \n\
         2. Zoom(key Z) to desired ROI, input ROI dimension, press 'Crop'(Key C), drag(Key E) to fine tune ROI. \n\
-        3. Find manually or press 'Auto Rescale'(key R) for optimal contrast clipping values. \n\
+        3. Press 'Auto Rescale'(key R) for optimal contrast clipping values. \n\
         4. Press 'Save!' to save coords to .csv file, 'home'(key F) to go back or 'Select File' for another data. \n\
-        5. Only use falsecolor function after you crop it. \n \
 You are viewing the 8x downsampled of the fused data. ")
-
         # Loading data label
-        self.loading_label = QLabel()
         note_layout = QHBoxLayout()
+        self.FC_res_label = QLabel("Resolution for FC:")
+        self.FC_res = QComboBox()
+        self.FC_res.addItem("4X ds")
+        self.FC_res.addItem("2X ds")
+        self.FC_export_button = QPushButton("Export FC TIFF stacks")
+        self.FC_export_button.clicked.connect(self.SaveFC3D)
+        self.loading_label = QLabel()
         note_layout.addWidget(note_label, alignment=Qt.AlignTop | Qt.AlignLeft)
-        note_layout.addWidget(self.loading_label, alignment=Qt.AlignBottom | Qt.AlignRight)
+        note_right = QVBoxLayout()
+        note_right_fc = QHBoxLayout()
+        note_right_fc.addWidget(self.FC_res_label)
+        note_right_fc.addWidget(self.FC_res)
+        note_right.addLayout(note_right_fc)
+        note_right.addWidget(self.FC_export_button)
+        note_right.addWidget(self.loading_label, alignment=Qt.AlignBottom | Qt.AlignCenter)
+        note_layout.addLayout(note_right, stretch=1)
 
         # Create a matplotlib figure
         self.figure = plt.figure()
@@ -140,7 +152,7 @@ You are viewing the 8x downsampled of the fused data. ")
         clip_high_layout1 = QHBoxLayout()
         clip_high_layout1.addWidget(QLabel("Clip High:"))
         self.ClipHighLim_cyto = QDoubleSpinBox()
-        self.ClipHighLim_cyto.setRange(0, 30000)
+        self.ClipHighLim_cyto.setRange(200, 35000)
         self.ClipHighLim_cyto.setSingleStep(50)
         self.ClipHighLim_cyto.setValue(ClipHigh_Cyto_default)
         clip_high_layout1.addWidget(self.ClipHighLim_cyto)
@@ -170,7 +182,7 @@ You are viewing the 8x downsampled of the fused data. ")
         clip_high_layout2 = QHBoxLayout()
         clip_high_layout2.addWidget(QLabel("Clip High:"))
         self.ClipHighLim_nuc = QDoubleSpinBox()
-        self.ClipHighLim_nuc.setRange(0, 30000)
+        self.ClipHighLim_nuc.setRange(200, 35000)
         self.ClipHighLim_nuc.setSingleStep(50)
         self.ClipHighLim_nuc.setValue(ClipHigh_Nuc_default)
         clip_high_layout2.addWidget(self.ClipHighLim_nuc)
@@ -189,6 +201,11 @@ You are viewing the 8x downsampled of the fused data. ")
         dropdown_container2 = QGroupBox("Nuc")
         dropdown_container2.setLayout(dropdown_layout2)
 
+        self.ClipHighLim_cyto.installEventFilter(self)
+        self.ClipLowLim_cyto.installEventFilter(self)
+        self.ClipHighLim_nuc.installEventFilter(self)
+        self.ClipLowLim_nuc.installEventFilter(self)
+
         ############## Add normalfactor1 and normalfactor2 for false-coloring ################
         dropdown_layout3 = QVBoxLayout()
         dropdown_layout3.addWidget(QLabel("FC style:"))
@@ -198,19 +215,19 @@ You are viewing the 8x downsampled of the fused data. ")
         dropdown_layout3.addWidget(self.dropdown3)
         Nuc_normafactor_layout = QHBoxLayout()
         Nuc_normafactor_layout.addWidget(QLabel("Nuc normfactor:"))
-        self.Nuc_normafactor = QDoubleSpinBox()
-        self.Nuc_normafactor.setRange(0, 15000)
-        self.Nuc_normafactor.setSingleStep(500)
-        self.Nuc_normafactor.setValue(5000)
-        Nuc_normafactor_layout.addWidget(self.Nuc_normafactor)
+        self.Nuc_normfactor = QDoubleSpinBox()
+        self.Nuc_normfactor.setRange(50, 15000)
+        self.Nuc_normfactor.setSingleStep(500)
+        self.Nuc_normfactor.setValue(8000)
+        Nuc_normafactor_layout.addWidget(self.Nuc_normfactor)
         Cyto_normfactor_layout = QHBoxLayout()
         Cyto_normfactor_layout.addWidget(QLabel("Cyto normfactor:"))
         self.Cyto_normfactor = QDoubleSpinBox()
-        self.Cyto_normfactor.setRange(0, 15000)
+        self.Cyto_normfactor.setRange(50, 15000)
         self.Cyto_normfactor.setSingleStep(500)
-        self.Cyto_normfactor.setValue(8000) 
+        self.Cyto_normfactor.setValue(10000) 
         self.Cyto_normfactor.valueChanged.connect(self.normfactor_cyto_change)
-        self.Nuc_normafactor.valueChanged.connect(self.normfactor_nuc_change)
+        self.Nuc_normfactor.valueChanged.connect(self.normfactor_nuc_change)
 
         Cyto_normfactor_layout.addWidget(self.Cyto_normfactor)
         dropdown_layout3.addLayout(Nuc_normafactor_layout)
@@ -221,8 +238,6 @@ You are viewing the 8x downsampled of the fused data. ")
         ############# Add Action buttons at bottom right corner ################
         file_button = QPushButton("HDF5 File")
         file_button.clicked.connect(self.select_file) 
-        define_savehome = QPushButton("Save where?")
-        define_savehome.clicked.connect(self.select_savehome) 
 
         # Override the behavior of the "Reset Original View" button
         home_button = self.toolbar.actions()[0] #String 0 = "Home" button
@@ -234,8 +249,7 @@ You are viewing the 8x downsampled of the fused data. ")
 
         button_layout = QHBoxLayout()
         button_layout.addWidget(file_button)
-        button_layout.addSpacing(30)
-        button_layout.addWidget(define_savehome)
+        button_layout.addSpacing(50)
         button_layout.addWidget(save_button)
         button_layout.addStretch()
 
@@ -264,8 +278,8 @@ You are viewing the 8x downsampled of the fused data. ")
         # Initialization and initial values
         self.save_home = os.getcwd()
         self.ROI_dim = 512
-        self.normfactor_nuc = 8000
-        self.normfactor_cyto = 5000
+        self.normfactor_nuc = 10000
+        self.normfactor_cyto = 10000
         self.select_file() # Including readHDF5() and plot_init_z()
 
         # Connect the mouse wheel event to the update_z_level method
@@ -293,6 +307,7 @@ You are viewing the 8x downsampled of the fused data. ")
             self.nuc = np.moveaxis(self.nuc, 0, 1)
 
         print(time.time() - start, "s")
+
 
     def plot_init_z(self):
 
@@ -329,7 +344,7 @@ You are viewing the 8x downsampled of the fused data. ")
         self.ClipLowLim_cyto.setEnabled(True)
         self.ClipHighLim_nuc.setEnabled(False) 
         self.ClipLowLim_nuc.setEnabled(False)  
-        self.Nuc_normafactor.setEnabled(False)
+        self.Nuc_normfactor.setEnabled(False)
         self.Cyto_normfactor.setEnabled(False)
         self.go_home()
 
@@ -345,21 +360,29 @@ You are viewing the 8x downsampled of the fused data. ")
         self.figure.canvas.mpl_disconnect(self.cid)
         ax = self.figure.gca()
         if ax:
-            self.x_limits = ax.get_xlim()
-            self.y_limits = ax.get_ylim()
+            # Don't let it pan out of bound
+            x_limits = ax.get_xlim()
+            y_limits = ax.get_ylim()
+            
+            if self.current_chan == "cyto" or self.current_chan == "nuc":
+                shape = self.shape
+                if x_limits[1]  > shape[2] - 1 or x_limits[0] < 0 or \
+                   y_limits[0]  > shape[1] - 1 or y_limits[1] < 0:
+                    self.show_OutofBound()
+                    ax.set_xlim(self.x_limits)
+                    ax.set_ylim(self.y_limits)
+                    self.canvas.draw()
+                    self.hide_text()
+                else:
+                    self.x_limits = x_limits
+                    self.y_limits = y_limits
 
             self.x_coordinate_textbox.setText(str(format(self.x_limits[0],".3f")))
             self.y_coordinate_textbox.setText(str(format(self.y_limits[1],".3f")))
 
             self.x_coordinate_textbox.update()
             self.y_coordinate_textbox.update()
-
-            if self.x_limits[0] + int(self.ROI_dim)/4 > self.shape[2] - 1 or \
-               self.y_limits[1] + int(self.ROI_dim)/4 > self.shape[1] - 1 :
-                self.show_OutofBound()
-            else: 
-                self.hide_text()
-
+            
 
     ########################## Update current Z-level ##########################################
 
@@ -412,7 +435,7 @@ You are viewing the 8x downsampled of the fused data. ")
         self.ClipLowLim_cyto.setEnabled(True)
         self.ClipHighLim_nuc.setEnabled(False)  
         self.ClipLowLim_nuc.setEnabled(False) 
-        self.Nuc_normafactor.setEnabled(False)
+        self.Nuc_normfactor.setEnabled(False)
         self.Cyto_normfactor.setEnabled(False)        
 
         self.plot_slice()
@@ -432,12 +455,13 @@ You are viewing the 8x downsampled of the fused data. ")
         self.ClipLowLim_nuc.setEnabled(True)
         self.ClipHighLim_cyto.setEnabled(False)  
         self.ClipLowLim_cyto.setEnabled(False) 
-        self.Nuc_normafactor.setEnabled(False)
+        self.Nuc_normfactor.setEnabled(False)
         self.Cyto_normfactor.setEnabled(False)
 
         self.plot_slice()
 
     def update_img2FC(self):
+        self.current_chan = "FC"
         self.FC_button.setChecked(True)
         self.nuc_button.setChecked(False)
         self.cyto_button.setChecked(False)  
@@ -448,23 +472,44 @@ You are viewing the 8x downsampled of the fused data. ")
         self.ClipLowLim_nuc.setEnabled(False)
         self.ClipHighLim_cyto.setEnabled(False)  
         self.ClipLowLim_cyto.setEnabled(False) 
-        self.Nuc_normafactor.setEnabled(True)
+        self.Nuc_normfactor.setEnabled(True)
         self.Cyto_normfactor.setEnabled(True)
 
-        self.cyto_fc, self.nuc_fc = self.readHDF5_FC()
+        self.cyto_fc, self.nuc_fc = self.readHDF5_FC(zlvl="")
         self.Draw_FC()
+
+    def eventFilter(self, obj, event):
+        if obj == self.ClipHighLim_nuc and event.type() == QEvent.MouseButtonPress:
+            if not self.ClipHighLim_nuc.isEnabled():
+                self.update_img2nuc()
+        if obj == self.ClipLowLim_nuc and event.type() == QEvent.MouseButtonPress:
+            if not self.ClipLowLim_nuc.isEnabled():
+                self.update_img2nuc()
+                    
+        if obj == self.ClipHighLim_cyto and event.type() == QEvent.MouseButtonPress:
+            if not self.ClipHighLim_cyto.isEnabled():
+                self.update_img2cyto()
+        if obj == self.ClipLowLim_cyto and event.type() == QEvent.MouseButtonPress:
+            if not self.ClipLowLim_cyto.isEnabled():
+                self.update_img2cyto()
+
+        return super().eventFilter(obj, event)
+
 
 
     #################################### False-coloring ####################################
 
-    def readHDF5_FC(self):
+    def readHDF5_FC(self, zlvl):
         ystart   = int(self.x_limits[0]*4)
         xstart   = int(self.y_limits[1]*4)
-        zstart = int(self.current_z_level*4)
-        ROI_dim = int(self.ROI_dim)
-        xend = xstart + ROI_dim
-        yend = ystart + ROI_dim
-        zend = zstart + 1
+        yend = int(self.x_limits[1]*4)
+        xend = int(self.y_limits[0]*4)
+        if zlvl == "":
+            zstart = int(self.current_z_level*4)
+            zend = zstart + 1
+        else: 
+            zstart = zlvl
+            zend = zlvl+1
 
         if self.orient == 1: 
             with h5.File(self.h5path, 'r') as f:
@@ -482,6 +527,7 @@ You are viewing the 8x downsampled of the fused data. ")
 
         cyto_fc = fun.FC_rescale(cyto_fc, self.ClipLowLim_cyto.value(), self.ClipHighLim_cyto.value())
         nuc_fc  = fun.FC_rescale(nuc_fc, self.ClipLowLim_nuc.value(), self.ClipHighLim_nuc.value())
+        self.FC_shape = cyto_fc.shape
   
         return cyto_fc, nuc_fc
 
@@ -510,8 +556,41 @@ You are viewing the 8x downsampled of the fused data. ")
         self.canvas.draw()
         self.hide_text()
 
+
+    def SaveFC3D(self):
+        import tifffile
+        
+        HE_settings = {'nuclei': [0.17, 0.27, 0.105], 'cyto': [0.05, 1.0, 0.54]}
+        file_dialog = QFileDialog()
+        folder = file_dialog.getExistingDirectory(self, "Select folder for 2D FC TIFF stacks")
+        if folder:
+            self.cyto_button.setChecked(False)
+            self.nuc_button.setChecked(False)  
+            self.dropdown1.setEnabled(False)
+            self.dropdown2.setEnabled(False)  
+            self.dropdown3.setEnabled(False) 
+            self.ClipHighLim_cyto.setEnabled(False) 
+            self.ClipLowLim_cyto.setEnabled(False)
+            self.ClipHighLim_nuc.setEnabled(False) 
+            self.ClipLowLim_nuc.setEnabled(False)  
+            self.Nuc_normfactor.setEnabled(False)
+            self.Cyto_normfactor.setEnabled(False)
+
+            for z in tqdm(range(self.shape[0]*4), desc="False coloring..."):
+                self.show_false_coloring()
+                cyto_fc, nuc_fc = self.readHDF5_FC(zlvl=z)
+
+                pseudoHE = fun.rapidFalseColor(nuc_fc[0], cyto_fc[0], 
+                                                HE_settings['nuclei'], HE_settings['cyto'],
+                                                nuc_normfactor = self.normfactor_nuc, 
+                                                cyto_normfactor = self.normfactor_cyto)
+                path = folder + os.sep + self.h5path.split("-23_")[1].split("_well")[0] + "_" + str(z) + ".tiff"
+                tifffile.imwrite(path, pseudoHE)
+
+        self.hide_text()
+
     def normfactor_nuc_change(self):
-        self.normfactor_nuc = self.Nuc_normafactor.value()
+        self.normfactor_nuc = self.Nuc_normfactor.value()
         self.Draw_FC()
 
     def normfactor_cyto_change(self):
@@ -636,6 +715,7 @@ You are viewing the 8x downsampled of the fused data. ")
         ax.set_ylim(self.y_limits)  
 
         self.canvas.draw()
+        self.FC_button.setChecked(False)
 
     ############################## Print loading/saving ###################################
 
@@ -659,7 +739,7 @@ You are viewing the 8x downsampled of the fused data. ")
         QApplication.processEvents()
 
     def show_OutofBound(self):
-        self.loading_label.setText("Out of bound! Don't save!")
+        self.loading_label.setText("Out of bound!")
         self.loading_label.setStyleSheet("color: red;")
         QApplication.processEvents()
 
@@ -685,19 +765,6 @@ You are viewing the 8x downsampled of the fused data. ")
             self.hide_text()
         else: 
             #self.h5path = "W:\\Trilabel_Data\\PGP9.5\\OTLS4_NODO_6-7-23_16-043J_PGP9.5\\data-f0.h5"
-            pass
-
-    def select_savehome(self):
-        file_dialog = QFileDialog()
-        savehome = file_dialog.getExistingDirectory(self, "Select save directory")
-        self.save_home = savehome
-        if savehome:
-            if self.Antibody == "":
-                self.Antibody = "PGP9.5"
-            self.Ab_home = savehome + os.sep + self.Antibody
-            print("Save directory : ", self.Ab_home)
-            self.show_savedir()
-        else: 
             pass
 
     def go_home(self):
@@ -730,22 +797,24 @@ You are viewing the 8x downsampled of the fused data. ")
         cyto_clipHigh = self.ClipHighLim_cyto.value()
         nuc_clipLow   = self.ClipLowLim_nuc.value()
         nuc_clipHigh  = self.ClipHighLim_nuc.value()
+        cyto_factor   = self.Cyto_normfactor.value()
+        nuc_factor    = self.Nuc_normfactor.value()
 
         note = self.note_textbox.text()
         h5path = self.h5path
-        Abhome = self.Ab_home
 
         if xcoord < 0:
             xcoord = 0
         if ycoord < 0:
             ycoord = 0
 
-        headers = ["h5path", "Abhome", "xcoord", "ycoord", "zcoord", "ROIdim", "Shape(8xds)",
+        headers = ["h5path", "xcoord", "ycoord", "zcoord", "ROIdim", "Shape(8xds)",
                    "orient", "cyto_clipLow", "cyto_clipHigh", "nuc_clipLow", "nuc_clipHigh",
+                   "cyto_factor", "nuc_factor"
                     "Note"]
-        values =  [h5path, Abhome, ycoord, xcoord, currentZ, ROI_dim, shape,
+        values =  [h5path, ycoord, xcoord, currentZ, ROI_dim, shape,
                    orient, cyto_clipLow, cyto_clipHigh, nuc_clipLow,
-                   nuc_clipHigh, note]
+                   nuc_clipHigh, cyto_factor, nuc_factor, note]
 
         date =  str(datetime.date.today())
         filename = "ROI_coords_" + date + ".csv"
