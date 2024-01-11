@@ -188,8 +188,8 @@ def collectImgStackFused(f,
                                    '{:0>6d}'.format(x2),
                                    '{:0>6d}'.format(y1),
                                    '{:0>6d}'.format(y2),
-                                   '{:0>6d}'.format(zcoords[1]),
-                                   '{:0>6d}'.format(zcoords[0]))
+                                   '{:0>6d}'.format(zcoords[0]),
+                                   '{:0>6d}'.format(zcoords[1]))
                                   )
 
         if not os.path.exists(blockdir):
