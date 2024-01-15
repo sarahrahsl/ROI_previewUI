@@ -6,4 +6,5 @@ Old coords/*
 Utility/*
 .ipynb_checkpoints/
 **/__pycache__/
+train/*
 
