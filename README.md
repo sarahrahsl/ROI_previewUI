@@ -2,39 +2,69 @@
 
 **This GUI allows you to preview hdf5 data to decide where to generate ROI training data for [ITAS3D](https://github.com/WeisiX/ITAS3D).**
 
-## Instruction for Previewing ROI
+Edited by Sarah Chow
+
+## Contents
+- [System requirements](#system-requirements)
+- [Installation](#installation)
+- [GUI guide](#instruction-for-previewing-gui-to-export-csv-file-for-roi-generation)
+- [Generating Training ROIs](#ipynb-to-generate-training-rois)
+- [False-coloring Training ROIs](#ipynb-to-false-color-training-rois)
+
+## System requirements
+This GUI is written in Python. Users should install Anaconda (tested on Conda 4.12.0, Python 3.9.13, Window 10)
+
+In addition, the following packages are required, many of which come with Python/Anaconda. This code has been tested with the version number indicated, though other versions may also work.
+  - pandas=1.4.4
+  - matplotlib=3.5.2
+  - pyqt=5.15.7
+
+## Installation
+After installing the required packages above, run the following command in Anaconda to clone this repository:
+```bash
+git clone https://github.com/sarahrahsl/ROI_previewUI.git
+```
+To set up the environment, you can run the following: 
+
+```
+conda env create -f tech_review/CSE583.yml
+```
+
+
+## Instruction for Previewing GUI to export CSV file for ROI generation
 
 1. Run the following command to execute the Previewing UI:
 
 	```
+	cd GUI/
 	python ROI_v2.py
 	```
 
 2. Select the .h5 file (fused) from the prompt window for which you want to create ROIs.
 3. Scroll on the image to view different z-levels.
-4. Change to different channels to view staining quality.
+4. Change to different channels (key a, s, d)
 5. Adjust the aggressiveness of contrast clipping by pressing the up/down arrow on the clip values boxes.
-6. Only the target channel allows using CLAHE as a contrast enhancement method.
-7. Zoom in using the magnifying icon and click the **"crop"** button to crop to a specific ROI dimension.
-8. Press **"Auto rescale"** to use the 2nd percentile and 98th percentile for contrast clipping calculated from current viewing ROI.
-9. Click **"Save where?"** to specify a saving home path, and choose the appropriate antibody for target channel you are saving.
+7. Zoom in using the magnifying icon (or key z) and click the **"crop"** button (or key c) to crop to a specific ROI dimension.
+8. Press **"Auto rescale"** (or key r) to use the 2nd percentile and 98th percentile for contrast clipping calculated from current viewing ROI.
+9. Click **"Train root"** to specify the directory for your "train" folder, i.e., the antibody for target channel for training ROI generation.
 8. **Remember to Press "SAVE"** to export all parameters to a .csv file. There should be 12 parameters including x, y-coordinates of the top-left corner of the ROI.
 9. Continue moving to different areas and press "SAVE" until you have enough ROIs.
-10. Close the GUI when you are done, or press "Select file" to view another .h5 file.
+10. Close the GUI when you are done, or press "HDF5 file" to view another .h5 file.
 
 
-## Instruction for ROI Generation
+## IPYNB to generate training ROIs
 
 To generate ROI training data, follow these steps:
 
-1. Run the Jupyter notebook: *generate_ROI_PGP.ipynb*
+- Use ***scripts/generate_training_ROI.ipynb***
 
-2. Choose between the **Manual** or **Auto** options:
-
-	- **Manual**: Input all the 12 parameters yourself.
-	- **Auto**: Change the name of the .csv file that contains all the parameters of ROIs. The parameters are saved by running *ROI_v2.py* (look at [Instruction for Previewing ROI](#instruction-for-previewing-roi))
+- Change the name of the CSV file that contains all the parameters of ROIs. The parameters are saved by running *ROI_v2.py* (look at [Instruction for Previewing ROI](#instruction-for-previewing-roi))
 
 The Jupyter notebook calls *CollectingImgStackFused.py,* which contains all the necessary functions for ROI generation.
 
 
 **Note**: Ensure that you have the necessary dependencies installed to run the code successfully.
+
+## IPYNB to false-color training ROIs
+
+- Use ***scripts/generate_FC_ROI.ipynb***
