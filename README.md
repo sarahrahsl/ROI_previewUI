@@ -2,7 +2,6 @@
 
 **This GUI allows you to preview hdf5 data to decide where to generate ROI training data for [ITAS3D](https://github.com/WeisiX/ITAS3D).**
 
-Edited by Sarah Chow
 
 ## Contents
 - [System requirements](#system-requirements)
@@ -18,6 +17,7 @@ In addition, the following packages are required, many of which come with Python
   - pandas=1.4.4
   - matplotlib=3.5.2
   - pyqt=5.15.7
+  - h5py=2.10.0
 
 ## Installation
 After installing the required packages above, run the following command in Anaconda to clone this repository:
@@ -27,11 +27,15 @@ git clone https://github.com/sarahrahsl/ROI_previewUI.git
 To set up the environment, you can run the following: 
 
 ```
-conda env create -f tech_review/CSE583.yml
+conda env create -f environment.yml
 ```
+
+Alternatively, you can manually install the python library packages specified in [System requirements](#system-requirements)
 
 
 ## Instruction for Previewing GUI to export CSV file for ROI generation
+
+The exported CSV file is very useful for subsequent training ROI generation and training ROI false-color, make sure you do this step first. 
 
 1. Run the following command to execute the Previewing UI:
 
@@ -47,24 +51,29 @@ conda env create -f tech_review/CSE583.yml
 7. Zoom in using the magnifying icon (or key z) and click the **"crop"** button (or key c) to crop to a specific ROI dimension.
 8. Press **"Auto rescale"** (or key r) to use the 2nd percentile and 98th percentile for contrast clipping calculated from current viewing ROI.
 9. Click **"Train root"** to specify the directory for your "train" folder, i.e., the antibody for target channel for training ROI generation.
-8. **Remember to Press "SAVE"** to export all parameters to a .csv file. There should be 12 parameters including x, y-coordinates of the top-left corner of the ROI.
+8. Press **"SAVE"** to export all parameters to a **CSV file**. There should be 12 parameters including x, y-coordinates of the top-left corner of the ROI. 
 9. Continue moving to different areas and press "SAVE" until you have enough ROIs.
 10. Close the GUI when you are done, or press "HDF5 file" to view another .h5 file.
 
 
 ## IPYNB to generate training ROIs
 
-To generate ROI training data, follow these steps:
+To generate ROI training data, make sure you have the CSV file ready, follow these steps:
 
 - Use ***scripts/generate_training_ROI.ipynb***
 
-- Change the name of the CSV file that contains all the parameters of ROIs. The parameters are saved by running *ROI_v2.py* (look at [Instruction for Previewing ROI](#instruction-for-previewing-roi))
+- Change the name of the CSV file that contains all the parameters of ROIs. 
 
 The Jupyter notebook calls *CollectingImgStackFused.py,* which contains all the necessary functions for ROI generation.
 
 
-**Note**: Ensure that you have the necessary dependencies installed to run the code successfully.
+
 
 ## IPYNB to false-color training ROIs
 
 - Use ***scripts/generate_FC_ROI.ipynb***
+- Change the name of the CSV file that contains all the parameters of the ROIs. 
+
+
+
+**Note**: Ensure that you have the necessary dependencies installed to run the code successfully.
