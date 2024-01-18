@@ -81,7 +81,8 @@ def collectImgStackFused(f,
                     nuc_clip_low   = 100,   # nuc channel
                     nuc_clip_high  = 5000,  # nuc channel
                     cyto_clip_low  = 100,   # cyto channel
-                    cyto_clip_high = 3000): # cyto channel
+                    cyto_clip_high = 3000,
+                    res = 1): # cyto channel
     """
     Method for reading in chunks of h5 data with specified coordinates,
     preprocessing the data as necessary, and saving it as 8-bit zstacks,
@@ -100,9 +101,6 @@ def collectImgStackFused(f,
     block_name : str
         Sample name for directory name in training dir
 
-    tile_id : tuple
-        Tuple of tiles to extract ROI from.
-
     zcoords : tuple
         Tuple containing z coordinates of image to read in. Should always
         result in a stack of 100 images
@@ -115,9 +113,8 @@ def collectImgStackFused(f,
         lateral coordinates for image to read in. Should be roughly 700 for
          oxford
 
-    target_chan : str
-        Default is 'ch2'. Target (antibody) channel identifier which will call
-         the preprocessing method on this set of images.
+    res : int
+        The resolution to read.
 
 
     Returns
@@ -238,13 +235,14 @@ def collectImgStackFused(f,
 
         # read in image chunk for channel
         print('reading img', ch[0])
+        r = str(res)
         if orient == 1:
-            img = f['t00000'][ch[0]]['1/cells'][x1:x2,
+            img = f['t00000'][ch[0]][r]['cells'][x1:x2,
                                                 zcoords[0]:zcoords[1],
                                                 y1:y2].astype(np.uint16)
             img = np.moveaxis(img, 0, 1)
         else:
-            img = f['t00000'][ch[0]]['1/cells'][zcoords[0]:zcoords[1],
+            img = f['t00000'][ch[0]][r]['cells'][zcoords[0]:zcoords[1],
                                                 x1:x2,
                                                 y1:y2].astype(np.uint16)
         # do preprocessing on target channel
