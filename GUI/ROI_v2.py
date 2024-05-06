@@ -574,6 +574,7 @@ You are viewing the 8x downsampled of fused.h5 file. ")
         self.Nuc_normfactor.setEnabled(True)
         self.Cyto_normfactor.setEnabled(True)
 
+        self.Crop_ROI()
         self.cyto_fc, self.nuc_fc, self.pgp_fc = self.readHDF5_FC()
         self.Draw_FC()
 
